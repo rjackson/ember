@@ -6,7 +6,7 @@
  *            Portions Copyright 2008-2011 Apple Inc. All rights reserved.
  * @license   Licensed under MIT license
  *            See https://raw.github.com/emberjs/ember.js/master/LICENSE
- * @version   2.2.0-beta.1
+ * @version   2.2.0-canary+328112bd
  */
 
 var enifed, requireModule, require, requirejs, Ember;
@@ -184,8 +184,9 @@ enifed('ember-debug/deprecate', ['exports', 'ember-metal/core', 'ember-metal/err
   
     @method deprecate
     @param {String} message A description of the deprecation.
-    @param {Boolean} test A boolean. If falsy, the deprecation
-      will be displayed.
+    @param {Boolean|Function} test A boolean. If falsy, the deprecation
+      will be displayed. If this is a function, it will be executed and its return
+      value will be used as condition.
     @param {Object} options An object that can be used to pass
       in a `url` to the transition guide on the emberjs.com website, and a unique
       `id` for this deprecation. The `id` can be used by Ember debugging tools
@@ -196,54 +197,30 @@ enifed('ember-debug/deprecate', ['exports', 'ember-metal/core', 'ember-metal/err
 
   function deprecate(message, test, options) {
     if (!options || !options.id && !options.until) {
-      deprecate(missingOptionsDeprecation, false, {
-        id: 'ember-debug.deprecate-options-missing',
-        until: '3.0.0',
-        url: 'http://emberjs.com/deprecations/v2.x/#toc_ember-debug-function-options'
-      });
+      deprecate(missingOptionsDeprecation, false, { id: 'ember-debug.deprecate-options-missing', until: '3.0.0' });
     }
 
     if (options && !options.id) {
-      deprecate(missingOptionsIdDeprecation, false, {
-        id: 'ember-debug.deprecate-id-missing',
-        until: '3.0.0',
-        url: 'http://emberjs.com/deprecations/v2.x/#toc_ember-debug-function-options'
-      });
+      deprecate(missingOptionsIdDeprecation, false, { id: 'ember-debug.deprecate-id-missing', until: '3.0.0' });
     }
 
     if (options && !options.until) {
-      deprecate(missingOptionsUntilDeprecation, options && options.until, {
-        id: 'ember-debug.deprecate-until-missing',
-        until: '3.0.0',
-        url: 'http://emberjs.com/deprecations/v2.x/#toc_ember-debug-function-options'
-      });
+      deprecate(missingOptionsUntilDeprecation, options && options.until, { id: 'ember-debug.deprecate-until-missing', until: '3.0.0' });
     }
 
     _emberDebugHandlers.invoke.apply(undefined, ['deprecate'].concat(_slice.call(arguments)));
   }
 });
-enifed('ember-debug/handlers', ['exports', 'ember-debug/is-plain-function', 'ember-debug/deprecate'], function (exports, _emberDebugIsPlainFunction, _emberDebugDeprecate) {
+enifed('ember-debug/handlers', ['exports', 'ember-debug/is-plain-function'], function (exports, _emberDebugIsPlainFunction) {
   'use strict';
 
-  exports.generateTestAsFunctionDeprecation = generateTestAsFunctionDeprecation;
   exports.registerHandler = registerHandler;
   exports.invoke = invoke;
   var HANDLERS = {};
 
   exports.HANDLERS = HANDLERS;
-
-  function generateTestAsFunctionDeprecation(source) {
-    return 'Calling `' + source + '` with a function argument is deprecated. Please ' + 'use `!!Constructor` for constructors, or an `IIFE` to compute the test for deprecation. ' + 'In a future version functions will be treated as truthy values instead of being executed.';
-  }
-
-  function normalizeTest(test, source) {
-    if (_emberDebugIsPlainFunction.default(test)) {
-      _emberDebugDeprecate.default(generateTestAsFunctionDeprecation(source), false, { id: 'ember-debug.deprecate-test-as-function', until: '2.5.0' });
-
-      return test();
-    }
-
-    return test;
+  function normalizeTest(test) {
+    return _emberDebugIsPlainFunction.default(test) ? test() : test;
   }
 
   function registerHandler(type, callback) {
@@ -255,7 +232,7 @@ enifed('ember-debug/handlers', ['exports', 'ember-debug/is-plain-function', 'emb
   }
 
   function invoke(type, message, test, options) {
-    if (normalizeTest(test, 'Ember.' + type)) {
+    if (normalizeTest(test)) {
       return;
     }
 
@@ -315,25 +292,17 @@ enifed('ember-debug/warn', ['exports', 'ember-metal/logger', 'ember-metal/debug'
 
   function warn(message, test, options) {
     if (!options) {
-      _emberMetalDebug.deprecate(missingOptionsDeprecation, false, {
-        id: 'ember-debug.warn-options-missing',
-        until: '3.0.0',
-        url: 'http://emberjs.com/deprecations/v2.x/#toc_ember-debug-function-options'
-      });
+      _emberMetalDebug.deprecate(missingOptionsDeprecation, false, { id: 'ember-debug.warn-options-missing', until: '3.0.0' });
     }
 
     if (options && !options.id) {
-      _emberMetalDebug.deprecate(missingOptionsIdDeprecation, false, {
-        id: 'ember-debug.warn-id-missing',
-        until: '3.0.0',
-        url: 'http://emberjs.com/deprecations/v2.x/#toc_ember-debug-function-options'
-      });
+      _emberMetalDebug.deprecate(missingOptionsIdDeprecation, false, { id: 'ember-debug.warn-id-missing', until: '3.0.0' });
     }
 
     _emberDebugHandlers.invoke.apply(undefined, ['warn'].concat(_slice.call(arguments)));
   }
 });
-enifed('ember-debug', ['exports', 'ember-metal/core', 'ember-metal/debug', 'ember-metal/features', 'ember-metal/error', 'ember-metal/logger', 'ember-metal/environment', 'ember-debug/deprecate', 'ember-debug/warn', 'ember-debug/is-plain-function', 'ember-debug/handlers'], function (exports, _emberMetalCore, _emberMetalDebug, _emberMetalFeatures, _emberMetalError, _emberMetalLogger, _emberMetalEnvironment, _emberDebugDeprecate, _emberDebugWarn, _emberDebugIsPlainFunction, _emberDebugHandlers) {
+enifed('ember-debug', ['exports', 'ember-metal/core', 'ember-metal/debug', 'ember-metal/features', 'ember-metal/error', 'ember-metal/logger', 'ember-metal/environment', 'ember-debug/deprecate', 'ember-debug/warn', 'ember-debug/is-plain-function'], function (exports, _emberMetalCore, _emberMetalDebug, _emberMetalFeatures, _emberMetalError, _emberMetalLogger, _emberMetalEnvironment, _emberDebugDeprecate, _emberDebugWarn, _emberDebugIsPlainFunction) {
   'use strict';
 
   exports._warnIfUsingStrippedFeatureFlags = _warnIfUsingStrippedFeatureFlags;
@@ -364,16 +333,15 @@ enifed('ember-debug', ['exports', 'ember-metal/core', 'ember-metal/debug', 'embe
     @method assert
     @param {String} desc A description of the assertion. This will become
       the text of the Error thrown if the assertion fails.
-    @param {Boolean} test Must be truthy for the assertion to pass. If
-      falsy, an exception will be thrown.
+    @param {Boolean|Function} test Must be truthy for the assertion to pass. If
+      falsy, an exception will be thrown. If this is a function, it will be executed and
+      its return value will be used as condition.
     @public
   */
   _emberMetalDebug.setDebugFunction('assert', function assert(desc, test) {
-    var throwAssertion = undefined;
+    var throwAssertion;
 
     if (_emberDebugIsPlainFunction.default(test)) {
-      _emberMetalDebug.deprecate(_emberDebugHandlers.generateTestAsFunctionDeprecation('Ember.assert'), false, { id: 'ember-debug.deprecate-test-as-function', until: '2.5.0' });
-
       throwAssertion = !test();
     } else {
       throwAssertion = !test;
@@ -525,6 +493,10 @@ enifed('ember-debug', ['exports', 'ember-metal/core', 'ember-metal/debug', 'embe
     _emberMetalFeatures.FEATURES['features-stripped-test'] = true;
     var featuresWereStripped = true;
 
+    if (_emberMetalFeatures.default('features-stripped-test')) {
+      featuresWereStripped = false;
+    }
+
     delete _emberMetalFeatures.FEATURES['features-stripped-test'];
     _warnIfUsingStrippedFeatureFlags(_emberMetalCore.default.ENV.FEATURES, featuresWereStripped);
 
@@ -548,66 +520,10 @@ enifed('ember-debug', ['exports', 'ember-metal/core', 'ember-metal/debug', 'embe
       }, false);
     }
   }
-  /**
-    @public
-    @class Ember.Debug
-  */
+
   _emberMetalCore.default.Debug = {};
 
-  /**
-    Allows for runtime registration of handler functions that override the default deprecation behavior.
-    Deprecations are invoked by calls to [Ember.deprecate](http://emberjs.com/api/classes/Ember.html#method_deprecate).
-    The following example demonstrates its usage by registering a handler that throws an error if the
-    message contains the word "should", otherwise defers to the default handler.
-     ```javascript
-    Ember.Debug.registerDeprecationHandler((message, options, next) => {
-      if (message.indexOf('should') !== -1) {
-        throw new Error(`Deprecation message with should: ${message}`);
-      } else {
-        // defer to whatever handler was registered before this one
-        next(message, options);
-      }
-    }
-    ```
-     The handler function takes the following arguments:
-     <ul>
-      <li> <code>message</code> - The message received from the deprecation call. </li>
-      <li> <code>options</code> - An object passed in with the deprecation call containing additional information including:</li>
-        <ul>
-          <li> <code>id</code> - an id of the deprecation in the form of <code>package-name.specific-deprecation</code>.</li>
-          <li> <code>until</code> - is the version number Ember the feature and deprecation will be removed in.</li>
-        </ul>
-      <li> <code>next</code> - a function that calls into the previously registered handler.</li>
-    </ul>
-     @public
-    @static
-    @method registerDeprecationHandler
-    @param handler {Function} a function to handle deprecation calls
-  */
   _emberMetalCore.default.Debug.registerDeprecationHandler = _emberDebugDeprecate.registerHandler;
-  /**
-    Allows for runtime registration of handler functions that override the default warning behavior.
-    Warnings are invoked by calls made to [Ember.warn](http://emberjs.com/api/classes/Ember.html#method_warn).
-    The following example demonstrates its usage by registering a handler that does nothing overriding Ember's
-    default warning behavior.
-     ```javascript
-    // next is not called, so no warnings get the default behavior
-    Ember.Debug.registerWarnHandler(() => {});
-    ```
-     The handler function takes the following arguments:
-     <ul>
-      <li> <code>message</code> - The message received from the warn call. </li>
-      <li> <code>options</code> - An object passed in with the warn call containing additional information including:</li>
-        <ul>
-          <li> <code>id</code> - an id of the warning in the form of <code>package-name.specific-warning</code>.</li>
-        </ul>
-      <li> <code>next</code> - a function that calls into the previously registered handler.</li>
-    </ul>
-     @public
-    @static
-    @method registerWarnHandler
-    @param handler {Function} a function to handle warnings
-  */
   _emberMetalCore.default.Debug.registerWarnHandler = _emberDebugWarn.registerHandler;
 
   /*
@@ -987,6 +903,39 @@ enifed('ember-testing/helpers', ['exports', 'ember-metal/debug', 'ember-metal/fe
   */
   asyncHelper('click', click);
 
+  if (_emberMetalFeatures.default('ember-testing-checkbox-helpers')) {
+    /**
+      Checks a checkbox. Ensures the presence of the `checked` attribute
+       Example:
+       ```javascript
+      check('#remember-me').then(function() {
+        // assert something
+      });
+      ```
+       @method check
+      @param {String} selector jQuery selector finding an `input[type="checkbox"]`
+      element on the DOM to check
+      @return {RSVP.Promise}
+      @private
+    */
+    asyncHelper('check', check);
+
+    /**
+      Unchecks a checkbox. Ensures the absence of the `checked` attribute
+       Example:
+       ```javascript
+      uncheck('#remember-me').then(function() {
+       // assert something
+      });
+      ```
+       @method check
+      @param {String} selector jQuery selector finding an `input[type="checkbox"]`
+      element on the DOM to uncheck
+      @return {RSVP.Promise}
+      @private
+    */
+    asyncHelper('uncheck', uncheck);
+  }
   /**
     Simulates a key event, e.g. `keypress`, `keydown`, `keyup` with the desired keyCode
   
@@ -1197,36 +1146,6 @@ enifed('ember-testing/helpers', ['exports', 'ember-metal/debug', 'ember-metal/fe
   */
   asyncHelper('triggerEvent', triggerEvent);
 });
-
-/**
-  Checks a checkbox. Ensures the presence of the `checked` attribute
-   Example:
-   ```javascript
-  check('#remember-me').then(function() {
-    // assert something
-  });
-  ```
-   @method check
-  @param {String} selector jQuery selector finding an `input[type="checkbox"]`
-  element on the DOM to check
-  @return {RSVP.Promise}
-  @private
-*/
-
-/**
-  Unchecks a checkbox. Ensures the absence of the `checked` attribute
-   Example:
-   ```javascript
-  uncheck('#remember-me').then(function() {
-   // assert something
-  });
-  ```
-   @method check
-  @param {String} selector jQuery selector finding an `input[type="checkbox"]`
-  element on the DOM to uncheck
-  @return {RSVP.Promise}
-  @private
-*/
 enifed('ember-testing/initializers', ['exports', 'ember-runtime/system/lazy_load'], function (exports, _emberRuntimeSystemLazy_load) {
   'use strict';
 

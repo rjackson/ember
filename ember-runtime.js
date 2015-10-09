@@ -6,7 +6,7 @@
  *            Portions Copyright 2008-2011 Apple Inc. All rights reserved.
  * @license   Licensed under MIT license
  *            See https://raw.github.com/emberjs/ember.js/master/LICENSE
- * @version   2.2.0-beta.1
+ * @version   2.2.0-canary+328112bd
  */
 
 var enifed, requireModule, require, requirejs, Ember;
@@ -4619,7 +4619,7 @@ enifed('ember-metal/core', ['exports'], function (exports) {
   
     @class Ember
     @static
-    @version 2.2.0-beta.1
+    @version 2.2.0-canary+328112bd
     @public
   */
 
@@ -4663,11 +4663,11 @@ enifed('ember-metal/core', ['exports'], function (exports) {
   
     @property VERSION
     @type String
-    @default '2.2.0-beta.1'
+    @default '2.2.0-canary+328112bd'
     @static
     @public
   */
-  Ember.VERSION = '2.2.0-beta.1';
+  Ember.VERSION = '2.2.0-canary+328112bd';
 
   /**
     The hash of environment variables used to control various configuration
@@ -5496,7 +5496,7 @@ enifed('ember-metal/features', ['exports', 'ember-metal/core', 'ember-metal/assi
     @since 1.1.0
     @public
   */
-  var FEATURES = _emberMetalAssign.default({}, _emberMetalCore.default.ENV.FEATURES);exports.FEATURES = FEATURES;
+  var FEATURES = _emberMetalAssign.default({ "features-stripped-test": null, "ember-htmlbars-component-generation": null, "ember-testing-checkbox-helpers": null, "ember-application-visit": null, "ember-routing-route-configured-query-params": null, "ember-libraries-isregistered": null, "ember-routing-routable-components": null, "ember-metal-ember-assign": null, "ember-contextual-components": null }, _emberMetalCore.default.ENV.FEATURES);exports.FEATURES = FEATURES;
   // jshint ignore:line
 
   /**
@@ -7187,14 +7187,10 @@ enifed('ember-metal/meta', ['exports', 'ember-metal/meta_listeners', 'ember-meta
       ret = new Meta(obj, ret);
     }
 
-    // if `null` already, just set it to the new value
-    // otherwise define property first
-    if (obj.__ember_meta__ !== null) {
-      if (obj.__defineNonEnumerable) {
-        obj.__defineNonEnumerable(EMBER_META_PROPERTY);
-      } else {
-        Object.defineProperty(obj, '__ember_meta__', META_DESC);
-      }
+    if (obj.__defineNonEnumerable) {
+      obj.__defineNonEnumerable(EMBER_META_PROPERTY);
+    } else {
+      Object.defineProperty(obj, '__ember_meta__', META_DESC);
     }
     obj.__ember_meta__ = ret;
 
@@ -7739,7 +7735,7 @@ enifed('ember-metal/mixin', ['exports', 'ember-metal/core', 'ember-metal/error',
     // * Set up _super wrapping if necessary
     // * Set up computed property descriptors
     // * Copying `toString` in broken browsers
-    mergeMixins(mixins, m, descs, values, obj, keys);
+    mergeMixins(mixins, _emberMetalMeta.meta(obj), descs, values, obj, keys);
 
     for (var i = 0, l = keys.length; i < l; i++) {
       key = keys[i];
@@ -10210,7 +10206,7 @@ enifed('ember-metal/streams/proxy-stream', ['exports', 'ember-runtime/system/obj
 
   exports.default = ProxyStream;
 });
-enifed('ember-metal/streams/stream', ['exports', 'ember-metal/core', 'ember-metal/assign', 'ember-metal/debug', 'ember-metal/path_cache', 'ember-metal/observer', 'ember-metal/streams/utils', 'ember-metal/empty_object', 'ember-metal/streams/subscriber', 'ember-metal/streams/dependency', 'ember-metal/utils'], function (exports, _emberMetalCore, _emberMetalAssign, _emberMetalDebug, _emberMetalPath_cache, _emberMetalObserver, _emberMetalStreamsUtils, _emberMetalEmpty_object, _emberMetalStreamsSubscriber, _emberMetalStreamsDependency, _emberMetalUtils) {
+enifed('ember-metal/streams/stream', ['exports', 'ember-metal/core', 'ember-metal/assign', 'ember-metal/debug', 'ember-metal/path_cache', 'ember-metal/observer', 'ember-metal/streams/utils', 'ember-metal/empty_object', 'ember-metal/streams/subscriber', 'ember-metal/streams/dependency'], function (exports, _emberMetalCore, _emberMetalAssign, _emberMetalDebug, _emberMetalPath_cache, _emberMetalObserver, _emberMetalStreamsUtils, _emberMetalEmpty_object, _emberMetalStreamsSubscriber, _emberMetalStreamsDependency) {
   'use strict';
 
   exports.wrap = wrap;
@@ -10247,8 +10243,6 @@ enifed('ember-metal/streams/stream', ['exports', 'ember-metal/core', 'ember-meta
       this.dependencyHead = null;
       this.dependencyTail = null;
       this.observedProxy = null;
-      this.__ember_meta__ = null;
-      this[_emberMetalUtils.GUID_KEY] = null;
     },
 
     _makeChildStream: function (key) {
@@ -17069,11 +17063,7 @@ enifed('ember-runtime/mixins/registry_proxy', ['exports', 'ember-metal/debug', '
 
   function buildFakeRegistryFunction(instance, typeForMessage, deprecatedProperty, nonDeprecatedProperty) {
     return function () {
-      _emberMetalDebug.deprecate('Using `' + typeForMessage + '.registry.' + deprecatedProperty + '` is deprecated. Please use `' + typeForMessage + '.' + nonDeprecatedProperty + '` instead.', false, {
-        id: 'ember-application.app-instance-registry',
-        until: '3.0.0',
-        url: 'http://emberjs.com/deprecations/v2.x/#toc_ember-application-registry-ember-applicationinstance-registry'
-      });
+      _emberMetalDebug.deprecate('Using `' + typeForMessage + '.registry.' + deprecatedProperty + '` is deprecated. Please use `' + typeForMessage + '.' + nonDeprecatedProperty + '` instead.', false, { id: 'ember-application.app-instance-registry', until: '3.0.0' });
       return instance[nonDeprecatedProperty].apply(instance, arguments);
     };
   }
@@ -17633,7 +17623,7 @@ enifed('ember-runtime/system/core_object', ['exports', 'ember-metal', 'ember-met
     // possible.
 
     var wasApplied = false;
-    var initProperties;
+    var initMixins, initProperties;
 
     var Class = function () {
       if (!wasApplied) {
@@ -17648,6 +17638,12 @@ enifed('ember-runtime/system/core_object', ['exports', 'ember-metal', 'ember-met
       var m = _emberMetalMeta.meta(this);
       var proto = m.proto;
       m.proto = this;
+      if (initMixins) {
+        // capture locally so we can clear the closed over variable
+        var mixins = initMixins;
+        initMixins = null;
+        _emberMetalUtils.apply(this, this.reopen, mixins);
+      }
       if (initProperties) {
         // capture locally so we can clear the closed over variable
         var props = initProperties;
@@ -17756,7 +17752,9 @@ enifed('ember-runtime/system/core_object', ['exports', 'ember-metal', 'ember-met
 
       wasApplied = false;
     };
-
+    Class._initMixins = function (args) {
+      initMixins = args;
+    };
     Class._initProperties = function (args) {
       initProperties = args;
     };
@@ -18446,7 +18444,7 @@ enifed('ember-runtime/system/each_proxy', ['exports', 'ember-metal/debug', 'embe
   function EachProxy(content) {
     this._content = content;
     this._keys = undefined;
-    this.__ember_meta__ = null;
+    this.__ember_meta__ = undefined;
   }
 
   EachProxy.prototype = {
@@ -19211,22 +19209,13 @@ enifed('ember-runtime/system/string', ['exports', 'ember-metal/core', 'ember-met
     });
   });
 
-  var STRING_CLASSIFY_REGEXP_1 = /^(\-|_)+(.)?/;
-  var STRING_CLASSIFY_REGEXP_2 = /(.)(\-|\_|\.|\s)+(.)?/g;
-  var STRING_CLASSIFY_REGEXP_3 = /(^|\/|\.)([a-z])/g;
+  var STRING_CLASSIFY_REGEXP_1 = /(\-|\_|\.|\s)+(.)?/g;
+  var STRING_CLASSIFY_REGEXP_2 = /(^|\/|\.)([a-z])/g;
 
   var CLASSIFY_CACHE = new _emberMetalCache.default(1000, function (str) {
-    var replace1 = function (match, separator, chr) {
-      return chr ? '_' + chr.toUpperCase() : '';
-    };
-    var replace2 = function (match, initialChar, separator, chr) {
-      return initialChar + (chr ? chr.toUpperCase() : '');
-    };
-    var parts = str.split('/');
-    for (var i = 0, len = parts.length; i < len; i++) {
-      parts[i] = parts[i].replace(STRING_CLASSIFY_REGEXP_1, replace1).replace(STRING_CLASSIFY_REGEXP_2, replace2);
-    }
-    return parts.join('/').replace(STRING_CLASSIFY_REGEXP_3, function (match, separator, chr) {
+    return str.replace(STRING_CLASSIFY_REGEXP_1, function (match, separator, chr) {
+      return chr ? chr.toUpperCase() : '';
+    }).replace(STRING_CLASSIFY_REGEXP_2, function (match, separator, chr) {
       return match.toUpperCase();
     });
   });

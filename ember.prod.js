@@ -6,7 +6,7 @@
  *            Portions Copyright 2008-2011 Apple Inc. All rights reserved.
  * @license   Licensed under MIT license
  *            See https://raw.github.com/emberjs/ember.js/master/LICENSE
- * @version   2.2.0-beta.1
+ * @version   2.2.0-canary+328112bd
  */
 
 var enifed, requireModule, require, requirejs, Ember;
@@ -2808,11 +2808,7 @@ enifed('dom-helper/prop', ['exports'], function (exports) {
       // Some version of IE (like IE9) actually throw an exception
       // if you set input.type = 'something-unknown'
       type: true,
-      form: true,
-      // Chrome 46.0.2464.0: 'autocorrect' in document.createElement('input') === false
-      // Safari 8.0.7: 'autocorrect' in document.createElement('input') === false
-      // Mobile Safari (iOS 8.4 simulator): 'autocorrect' in document.createElement('input') === true
-      autocorrect: true
+      form: true
     },
 
     // element.form is actually a legitimate readOnly property, that is to be
@@ -3395,15 +3391,13 @@ enifed("dom-helper", ["exports", "htmlbars-runtime/morph", "morph-attr", "dom-he
 
   exports.default = DOMHelper;
 });
-enifed('ember-application/system/application-instance', ['exports', 'ember-metal/debug', 'ember-metal/features', 'ember-metal/property_get', 'ember-metal/property_set', 'ember-runtime/system/object', 'ember-metal/run_loop', 'ember-metal/computed', 'ember-runtime/mixins/container_proxy', 'ember-htmlbars/system/dom-helper', 'container/registry', 'ember-runtime/mixins/registry_proxy', 'ember-metal-views/renderer', 'ember-metal/assign', 'ember-metal/environment', 'ember-runtime/ext/rsvp', 'ember-views/system/jquery'], function (exports, _emberMetalDebug, _emberMetalFeatures, _emberMetalProperty_get, _emberMetalProperty_set, _emberRuntimeSystemObject, _emberMetalRun_loop, _emberMetalComputed, _emberRuntimeMixinsContainer_proxy, _emberHtmlbarsSystemDomHelper, _containerRegistry, _emberRuntimeMixinsRegistry_proxy, _emberMetalViewsRenderer, _emberMetalAssign, _emberMetalEnvironment, _emberRuntimeExtRsvp, _emberViewsSystemJquery) {
+enifed('ember-application/system/application-instance', ['exports', 'ember-metal/debug', 'ember-metal/features', 'ember-metal/property_get', 'ember-metal/property_set', 'ember-runtime/system/object', 'ember-metal/run_loop', 'ember-metal/computed', 'container/registry', 'ember-runtime/mixins/registry_proxy', 'ember-runtime/mixins/container_proxy', 'ember-metal/assign'], function (exports, _emberMetalDebug, _emberMetalFeatures, _emberMetalProperty_get, _emberMetalProperty_set, _emberRuntimeSystemObject, _emberMetalRun_loop, _emberMetalComputed, _containerRegistry, _emberRuntimeMixinsRegistry_proxy, _emberRuntimeMixinsContainer_proxy, _emberMetalAssign) {
   /**
   @module ember
   @submodule ember-application
   */
 
   'use strict';
-
-  var BootOptions = undefined;
 
   /**
     The `ApplicationInstance` encapsulates all of the stateful aspects of a
@@ -3487,66 +3481,28 @@ enifed('ember-application/system/application-instance', ['exports', 'ember-metal
       // appended to the rootElement, in the case of apps, to the fixture harness
       // in tests, or rendered to a string in the case of FastBoot.
       this.register('-application-instance:main', this, { instantiate: false });
-
-      this._booted = false;
-    },
-
-    /**
-      Initialize the `Ember.ApplicationInstance` and return a promise that resolves
-      with the instance itself when the boot process is complete.
-       The primary task here is to run any registered instance initializers.
-       See the documentation on `BootOptions` for the options it takes.
-       @private
-      @method boot
-      @param options
-      @return {Promise<Ember.ApplicationInstance,Error>}
-    */
-    boot: function () {
-      var _this = this;
-
-      var options = arguments.length <= 0 || arguments[0] === undefined ? {} : arguments[0];
-
-      if (this._bootPromise) {
-        return this._bootPromise;
-      }
-
-      this._bootPromise = new _emberRuntimeExtRsvp.default.Promise(function (resolve) {
-        return resolve(_this._bootSync(options));
-      });
-
-      return this._bootPromise;
-    },
-
-    /**
-      Unfortunately, a lot of existing code assumes booting an instance is
-      synchronous – specifically, a lot of tests assumes the last call to
-      `app.advanceReadiness()` or `app.reset()` will result in a new instance
-      being fully-booted when the current runloop completes.
-       We would like new code (like the `visit` API) to stop making this assumption,
-      so we created the asynchronous version above that returns a promise. But until
-      we have migrated all the code, we would have to expose this method for use
-      *internally* in places where we need to boot an instance synchronously.
-       @private
-    */
-    _bootSync: function (options) {
-      if (this._booted) {
-        return this;
-      }
-
-      this.application.runInstanceInitializers(this);
-
-      if (_emberMetalEnvironment.default.hasDOM) {
-        this.setupEventDispatcher();
-      }
-
-      this._booted = true;
-
-      return this;
     },
 
     router: _emberMetalComputed.computed(function () {
       return this.lookup('router:main');
     }).readOnly(),
+
+    /**
+      Instantiates and sets up the router, specifically overriding the default
+      location. This is useful for manually starting the app in FastBoot or
+      testing environments, where trying to modify the URL would be
+      inappropriate.
+       @param options
+      @private
+    */
+    overrideRouterLocation: function (options) {
+      var location = options && options.location;
+      var router = _emberMetalProperty_get.get(this, 'router');
+
+      if (location) {
+        _emberMetalProperty_set.set(router, 'location', location);
+      }
+    },
 
     /**
       This hook is called by the root-most Route (a.k.a. the ApplicationRoute)
@@ -3593,7 +3549,8 @@ enifed('ember-application/system/application-instance', ['exports', 'ember-metal
 
     /**
       Directs the router to route to a particular URL. This is useful in tests,
-      for example, to tell the app to start at a particular URL.
+      for example, to tell the app to start at a particular URL. Ensure that you
+      have called `setupRouter()` before calling this method.
        @param url {String} the URL the router should route to
       @private
     */
@@ -3653,154 +3610,6 @@ enifed('ember-application/system/application-instance', ['exports', 'ember-metal
   });
   exports.default = ApplicationInstance;
 });
-
-/**
-  Returns the current URL of the app instance. This is useful when your
-  app does not update the browsers URL bar (i.e. it uses the `'none'`
-  location adapter).
-   @public
-  @return {String} the current URL
-*/
-
-// `instance.visit(url)` should eventually replace `instance.handleURL()`;
-// the test helpers can probably be switched to use this implementation too
-
-/**
-  Navigate the instance to a particular URL. This is useful in tests, for
-  example, or to tell the app to start at a particular URL. This method
-  returns a promise that resolves with the app instance when the transition
-  is complete, or rejects if the transion was aborted due to an error.
-   @public
-  @param url {String} the destination URL
-  @return {Promise}
-*/
-
-// Resolve only after rendering is complete
-
-// TODO: why is this necessary? Shouldn't 'actions' queue be enough?
-// Also, aren't proimses supposed to be async anyway?
-
-// Keeps the location adapter's internal URL in-sync
-
-/**
-  A list of boot-time configuration options for customizing the behavior of
-  an `Ember.ApplicationInstance`.
-   This is an interface class that exists purely to document the available
-  options; you do not need to construct it manually. Simply pass a regular
-  JavaScript object containing the desired options into methods that require
-  one of these options object:
-   ```javascript
-  MyApp.visit("/", { location: "none", rootElement: "#container" });
-  ```
-   Not all combinations of the supported options are valid. See the documentation
-  on `Ember.Application#visit` for the supported configurations.
-   Internal, experimental or otherwise unstable flags are marked as private.
-   @class BootOptions
-  @namespace @Ember.ApplicationInstance
-  @public
-*/
-
-/**
-  Provide a specific instance of jQuery. This is useful in conjunction with
-  the `document` option, as it allows you to use a copy of `jQuery` that is
-  appropriately bound to the foreign `document` (e.g. a jsdom).
-   This is highly experimental and support very incomplete at the moment.
-   @property jQuery
-  @type Object
-  @default auto-detected
-  @private
-*/
-// This default is overridable below
-
-/**
-  Interactive mode: whether we need to set up event delegation and invoke
-  lifecycle callbacks on Components.
-   @property isInteractive
-  @type boolean
-  @default auto-detected
-  @private
-*/
-// This default is overridable below
-
-/**
-  Run in a full browser environment.
-   When this flag is set to `false`, it will disable most browser-specific
-  and interactive features. Specifically:
-   * It does not use `jQuery` to append the root view; the `rootElement`
-    (either specified as a subsequent option or on the application itself)
-    must already be an `Element` in the given `document` (as opposed to a
-    string selector).
-   * It does not set up an `EventDispatcher`.
-   * It does not run any `Component` lifecycle hooks (such as `didInsertElement`).
-   * It sets the `location` option to `"none"`. (If you would like to use
-    the location adapter specified in the app's router instead, you can also
-    specify `{ location: null }` to specifically opt-out.)
-   @property isBrowser
-  @type boolean
-  @default auto-detected
-  @public
-*/
-
-/**
-  Disable rendering completely.
-   When this flag is set to `true`, it will disable the entire rendering
-  pipeline. Essentially, this puts the app into "routing-only" mode. No
-  templates will be rendered, and no Components will be created.
-   @property shouldRender
-  @type boolean
-  @default true
-  @public
-*/
-
-/**
-  If present, render into the given `Document` object instead of the
-  global `window.document` object.
-   In practice, this is only useful in non-browser environment or in
-  non-interactive mode, because Ember's `jQuery` dependency is
-  implicitly bound to the current document, causing event delegation
-  to not work properly when the app is rendered into a foreign
-  document object (such as an iframe's `contentDocument`).
-   In non-browser mode, this could be a "`Document`-like" object as
-  Ember only interact with a small subset of the DOM API in non-
-  interactive mode. While the exact requirements have not yet been
-  formalized, the `SimpleDOM` library's implementation is known to
-  work.
-   @property document
-  @type Document
-  @default the global `document` object
-  @public
-*/
-
-/**
-  If present, overrides the application's `rootElement` property on
-  the instance. This is useful for testing environment, where you
-  might want to append the root view to a fixture area.
-   In non-browser mode, because Ember does not have access to jQuery,
-  this options must be specified as a DOM `Element` object instead of
-  a selector string.
-   See the documentation on `Ember.Applications`'s `rootElement` for
-  details.
-   @property rootElement
-  @type String|Element
-  @default null
-  @public
- */
-
-// Set these options last to give the user a chance to override the
-// defaults from the "combo" options like `isBrowser` (although in
-// practice, the resulting combination is probably invalid)
-
-/**
-  If present, overrides the router's `location` property with this
-  value. This is useful for environments where trying to modify the
-  URL would be inappropriate.
-   @property location
-  @type string
-  @default null
-  @public
-*/
-
-// For compatibility with existing code
 enifed('ember-application/system/application', ['exports', 'dag-map', 'container/registry', 'ember-metal', 'ember-metal/debug', 'ember-metal/features', 'ember-metal/property_get', 'ember-metal/property_set', 'ember-metal/empty_object', 'ember-runtime/system/lazy_load', 'ember-runtime/system/namespace', 'ember-application/system/resolver', 'ember-metal/run_loop', 'ember-metal/utils', 'ember-runtime/controllers/controller', 'ember-metal-views/renderer', 'ember-htmlbars/system/dom-helper', 'ember-views/views/select', 'ember-routing-views/views/outlet', 'ember-views/views/view', 'ember-views/system/event_dispatcher', 'ember-views/system/jquery', 'ember-routing/system/route', 'ember-routing/system/router', 'ember-routing/location/hash_location', 'ember-routing/location/history_location', 'ember-routing/location/auto_location', 'ember-routing/location/none_location', 'ember-routing/system/cache', 'ember-application/system/application-instance', 'ember-views/views/text_field', 'ember-views/views/text_area', 'ember-views/views/checkbox', 'ember-views/views/legacy_each_view', 'ember-routing-views/components/link-to', 'ember-routing/services/routing', 'ember-extension-support/container_debug_adapter', 'ember-runtime/mixins/registry_proxy', 'ember-metal/environment', 'ember-runtime/ext/rsvp'], function (exports, _dagMap, _containerRegistry, _emberMetal, _emberMetalDebug, _emberMetalFeatures, _emberMetalProperty_get, _emberMetalProperty_set, _emberMetalEmpty_object, _emberRuntimeSystemLazy_load, _emberRuntimeSystemNamespace, _emberApplicationSystemResolver, _emberMetalRun_loop, _emberMetalUtils, _emberRuntimeControllersController, _emberMetalViewsRenderer, _emberHtmlbarsSystemDomHelper, _emberViewsViewsSelect, _emberRoutingViewsViewsOutlet, _emberViewsViewsView, _emberViewsSystemEvent_dispatcher, _emberViewsSystemJquery, _emberRoutingSystemRoute, _emberRoutingSystemRouter, _emberRoutingLocationHash_location, _emberRoutingLocationHistory_location, _emberRoutingLocationAuto_location, _emberRoutingLocationNone_location, _emberRoutingSystemCache, _emberApplicationSystemApplicationInstance, _emberViewsViewsText_field, _emberViewsViewsText_area, _emberViewsViewsCheckbox, _emberViewsViewsLegacy_each_view, _emberRoutingViewsComponentsLinkTo, _emberRoutingServicesRouting, _emberExtensionSupportContainer_debug_adapter, _emberRuntimeMixinsRegistry_proxy, _emberMetalEnvironment, _emberRuntimeExtRsvp) {
   /**
   @module ember
@@ -4059,43 +3868,6 @@ enifed('ember-application/system/application', ['exports', 'dag-map', 'container
     */
     autoboot: true,
 
-    /**
-      Whether the application should be configured for the legacy "globals mode".
-      Under this mode, the Application object serves as a global namespace for all
-      classes.
-       ```javascript
-      var App = Ember.Application.create({
-        ...
-      });
-       App.Router.reopen({
-        location: 'none'
-      });
-       App.Router.map({
-        ...
-      });
-       App.MyComponent = Ember.Component.extend({
-        ...
-      });
-      ```
-       This flag also exposes other internal APIs that assumes the existence of
-      a special "default instance", like `App.__container__.lookup(...)`.
-       This option is currently not configurable, its value is derived from
-      the `autoboot` flag – disabling `autoboot` also implies opting-out of
-      globals mode support, although they are ultimately orthogonal concerns.
-       Some of the global modes features are already deprecated in 1.x. The
-      existence of this flag is to untangle the globals mode code paths from
-      the autoboot code paths, so that these legacy features can be reviewed
-      for deprecation/removal separately.
-       Forcing the (autoboot=true, _globalsMode=false) here and running the tests
-      would reveal all the places where we are still relying on these legacy
-      behavior internally (mostly just tests).
-       @property _globalsMode
-      @type Boolean
-      @default true
-      @private
-    */
-    _globalsMode: true,
-
     init: function () {
       this._super.apply(this, arguments);
 
@@ -4108,17 +3880,25 @@ enifed('ember-application/system/application', ['exports', 'dag-map', 'container
       registerLibraries();
       logLibraryVersions();
 
-      // Start off the number of deferrals at 1. This will be decremented by
-      // the Application's own `boot` method.
+      // Start off the number of deferrals at 1. This will be
+      // decremented by the Application's own `initialize` method.
       this._readinessDeferrals = 1;
-      this._booted = false;
 
-      // Force-assign these flags to their default values when the feature is
-      // disabled, this ensures we can rely on their values in other paths.
-      this.autoboot = this._globalsMode = true;
-
-      this._prepareForGlobalsMode();
-      this.waitForDOMReady();
+      if (_emberMetalFeatures.default('ember-application-visit')) {
+        if (this.autoboot) {
+          // Create subclass of Ember.Router for this Application instance.
+          // This is to ensure that someone reopening `App.Router` does not
+          // tamper with the default `Ember.Router`.
+          // 2.0TODO: Can we move this into a globals-mode-only library?
+          this.Router = (this.Router || _emberRoutingSystemRouter.default).extend();
+          this.buildDefaultInstance();
+          this.waitForDOMReady();
+        }
+      } else {
+        this.Router = (this.Router || _emberRoutingSystemRouter.default).extend();
+        this.buildDefaultInstance();
+        this.waitForDOMReady();
+      }
     },
 
     /**
@@ -4134,70 +3914,43 @@ enifed('ember-application/system/application', ['exports', 'dag-map', 'container
     },
 
     /**
-      Create an ApplicationInstance for this application.
+      Create a container for the current application's registry.
        @private
       @method buildInstance
-      @return {Ember.ApplicationInstance} the application instance
+      @return {Ember.Container} the configured container
     */
     buildInstance: function () {
-      var options = arguments.length <= 0 || arguments[0] === undefined ? {} : arguments[0];
-
-      options.application = this;
-      return _emberApplicationSystemApplicationInstance.default.create(options);
+      return _emberApplicationSystemApplicationInstance.default.create({
+        application: this
+      });
     },
 
-    /**
-      Enable the legacy globals mode by allowing this application to act
-      as a global namespace. See the docs on the `_globalsMode` property
-      for details.
-       Most of these features are already deprecated in 1.x, so we can
-      stop using them internally and try to remove them.
-       @private
-      @method _prepareForGlobalsMode
-    */
-    _prepareForGlobalsMode: function () {
-      // Create subclass of Ember.Router for this Application instance.
-      // This is to ensure that someone reopening `App.Router` does not
-      // tamper with the default `Ember.Router`.
-      this.Router = (this.Router || _emberRoutingSystemRouter.default).extend();
-
-      this._buildDeprecatedInstance();
-    },
-
-    /*
-      Build the deprecated instance for legacy globals mode support.
-      Called when creating and resetting the application.
-       This is orthogonal to autoboot: the deprecated instance needs to
-      be created at Application construction (not boot) time to expose
-      App.__container__ and the global Ember.View.views registry. If
-      autoboot sees that this instance exists, it will continue booting
-      it to avoid doing unncessary work (as opposed to building a new
-      instance at boot time), but they are otherwise unrelated.
-       @private
-      @method _buildDeprecatedInstance
-    */
-    _buildDeprecatedInstance: function () {
-      // Build a default instance
+    buildDefaultInstance: function () {
       var instance = this.buildInstance();
-
-      // Legacy support for App.__container__ and other global methods
-      // on App that rely on a single, default instance.
-      this.__deprecatedInstance__ = instance;
-      this.__container__ = instance.__container__;
 
       // For the default instance only, set the view registry to the global
       // Ember.View.views hash for backwards-compatibility.
       _emberViewsViewsView.default.views = instance.lookup('-view-registry:main');
+
+      // TODO2.0: Legacy support for App.__container__
+      // and global methods on App that rely on a single,
+      // default instance.
+      this.__deprecatedInstance__ = instance;
+      this.__container__ = instance.__container__;
+
+      return instance;
     },
 
     /**
-      Automatically kick-off the boot process for the application once the
-      DOM has become ready.
-       The initialization itself is scheduled on the actions queue which
-      ensures that code-loading finishes before booting.
-       If you are asynchronously loading code, you should call `deferReadiness()`
-      to defer booting, and then call `advanceReadiness()` once all of your code
-      has finished loading.
+      Automatically initialize the application once the DOM has
+      become ready.
+       The initialization itself is scheduled on the actions queue
+      which ensures that application loading finishes before
+      booting.
+       If you are asynchronously loading code, you should call
+      `deferReadiness()` to defer booting, and then call
+      `advanceReadiness()` once all of your code has finished
+      loading.
        @private
       @method waitForDOMReady
     */
@@ -4207,45 +3960,6 @@ enifed('ember-application/system/application', ['exports', 'dag-map', 'container
       } else {
         this.$().ready(_emberMetalRun_loop.default.bind(this, 'domReady'));
       }
-    },
-
-    /**
-      This is the autoboot flow:
-       1. Boot the app by calling `this.boot()`
-      2. Create an instance (or use the `__deprecatedInstance__` in globals mode)
-      3. Boot the instance by calling `instance.boot()`
-      4. Invoke the `App.ready()` callback
-      5. Kick-off routing on the instance
-       Ideally, this is all we would need to do:
-       ```javascript
-      _autoBoot() {
-        this.boot().then(() => {
-          let instance = (this._globalsMode) ? this.__deprecatedInstance__ : this.buildInstance();
-          return instance.boot();
-        }).then((instance) => {
-          App.ready();
-          instance.startRouting();
-        });
-      }
-      ```
-       Unfortunately, we cannot actually write this because we need to participate
-      in the "synchronous" boot process. While the code above would work fine on
-      the initial boot (i.e. DOM ready), when `App.reset()` is called, we need to
-      boot a new instance synchronously (see the documentation on `_bootSync()`
-      for details).
-       Because of this restriction, the actual logic of this method is located
-      inside `didBecomeReady()`.
-       @private
-      @method domReady
-    */
-    domReady: function () {
-      if (this.isDestroyed) {
-        return;
-      }
-
-      this._bootSync();
-
-      // Continues to `didBecomeReady`
     },
 
     /**
@@ -4288,68 +4002,48 @@ enifed('ember-application/system/application', ['exports', 'dag-map', 'container
     },
 
     /**
-      Initialize the application and return a promise that resolves with the `Ember.Application`
-      object when the boot process is complete.
-       Run any application initializers and run the application load hook. These hooks may
-      choose to defer readiness. For example, an authentication hook might want to defer
-      readiness until the auth token has been retrieved.
-       By default, this method is called automatically on "DOM ready"; however, if autoboot
-      is disabled, this is automatically called when the first application instance is
-      created via `visit`.
+      Calling initialize manually is not supported.
+       Please see Ember.Application#advanceReadiness and
+      Ember.Application#deferReadiness.
        @private
-      @method boot
-      @return {Promise<Ember.Application,Error>}
+      @deprecated
+      @method initialize
+     **/
+    initialize: function () {},
+
+    /**
+      Initialize the application. This happens automatically.
+       Run any initializers and run the application load hook. These hooks may
+      choose to defer readiness. For example, an authentication hook might want
+      to defer readiness until the auth token has been retrieved.
+       @private
+      @method domReady
     */
+    domReady: function () {
+      if (this.isDestroyed) {
+        return;
+      }
+
+      this.boot();
+
+      return this;
+    },
+
     boot: function () {
       if (this._bootPromise) {
         return this._bootPromise;
       }
 
-      try {
-        this._bootSync();
-      } catch (_) {
-        // Ignore th error: in the asynchronous boot path, the error is already reflected
-        // in the promise rejection
-      }
+      var defer = new _emberRuntimeExtRsvp.default.defer();
+      this._bootPromise = defer.promise;
+      this._bootResolver = defer;
+
+      this.runInitializers();
+      _emberRuntimeSystemLazy_load.runLoadHooks('application', this);
+
+      this.advanceReadiness();
 
       return this._bootPromise;
-    },
-
-    /**
-      Unfortunately, a lot of existing code assumes the booting process is
-      "synchronous". Specifically, a lot of tests assumes the last call to
-      `app.advanceReadiness()` or `app.reset()` will result in the app being
-      fully-booted when the current runloop completes.
-       We would like new code (like the `visit` API) to stop making this assumption,
-      so we created the asynchronous version above that returns a promise. But until
-      we have migrated all the code, we would have to expose this method for use
-      *internally* in places where we need to boot an app "synchronously".
-       @private
-    */
-    _bootSync: function () {
-      if (this._booted) {
-        return;
-      }
-
-      // Even though this returns synchronously, we still need to make sure the
-      // boot promise exists for book-keeping purposes: if anything went wrong in
-      // the boot process, we need to store the error as a rejection on the boot
-      // promise so that a future caller of `boot()` can tell what failed.
-      var defer = this._bootResolver = new _emberRuntimeExtRsvp.default.defer();
-      this._bootPromise = defer.promise;
-
-      try {
-        this.runInitializers();
-        _emberRuntimeSystemLazy_load.runLoadHooks('application', this);
-        this.advanceReadiness();
-        // Continues to `didBecomeReady`
-      } catch (error) {
-        // For the asynchronous boot path
-        defer.reject(error);
-
-        // For the synchronous boot path
-        throw error;
-      }
     },
 
     /**
@@ -4404,20 +4098,18 @@ enifed('ember-application/system/application', ['exports', 'dag-map', 'container
       ```
        @method reset
       @public
-    */
+    **/
     reset: function () {
-
       var instance = this.__deprecatedInstance__;
 
       this._readinessDeferrals = 1;
       this._bootPromise = null;
       this._bootResolver = null;
-      this._booted = false;
 
       function handleReset() {
         _emberMetalRun_loop.default(instance, 'destroy');
-        this._buildDeprecatedInstance();
-        _emberMetalRun_loop.default.schedule('actions', this, '_bootSync');
+
+        _emberMetalRun_loop.default.schedule('actions', this, 'domReady', this.buildDefaultInstance());
       }
 
       _emberMetalRun_loop.default.join(this, handleReset);
@@ -4473,32 +4165,24 @@ enifed('ember-application/system/application', ['exports', 'dag-map', 'container
       @method didBecomeReady
     */
     didBecomeReady: function () {
-      try {
-        // TODO: Is this still needed for _globalsMode = false?
+      if (this.autoboot) {
+        this.runInstanceInitializers(this.__deprecatedInstance__);
+
+        if (_emberMetalEnvironment.default.hasDOM) {
+          this.__deprecatedInstance__.setupEventDispatcher();
+        }
+
+        this.ready(); // user hook
+        this.__deprecatedInstance__.startRouting();
+
         if (!_emberMetal.default.testing) {
           // Eagerly name all classes that are already loaded
           _emberMetal.default.Namespace.processAll();
           _emberMetal.default.BOOTED = true;
         }
-
-        var instance = this.__deprecatedInstance__;
-
-        instance._bootSync();
-        this.ready();
-        instance.startRouting();
-
-        // For the asynchronous boot path
-        this._bootResolver.resolve(this);
-
-        // For the synchronous boot path
-        this._booted = true;
-      } catch (error) {
-        // For the asynchronous boot path
-        this._bootResolver.reject(error);
-
-        // For the synchronous boot path
-        throw error;
       }
+
+      this._bootResolver.resolve();
     },
 
     /**
@@ -4530,7 +4214,6 @@ enifed('ember-application/system/application', ['exports', 'dag-map', 'container
     willDestroy: function () {
       this._super.apply(this, arguments);
       _emberMetal.default.BOOTED = false;
-      this._booted = false;
       this._bootPromise = null;
       this._bootResolver = null;
 
@@ -4538,7 +4221,7 @@ enifed('ember-application/system/application', ['exports', 'dag-map', 'container
         _emberRuntimeSystemLazy_load._loaded.application = undefined;
       }
 
-      if (this._globalsMode && this.__deprecatedInstance__) {
+      if (this.__deprecatedInstance__) {
         this.__deprecatedInstance__.destroy();
       }
     },
@@ -4612,6 +4295,41 @@ enifed('ember-application/system/application', ['exports', 'dag-map', 'container
     */
     instanceInitializer: buildInitializerMethod('instanceInitializers', 'instance initializer')
   });
+
+  if (_emberMetalFeatures.default('ember-application-visit')) {
+    Application.reopen({
+      /**
+        Creates a new instance of the application and instructs it to route to the
+        specified initial URL. This method returns a promise that will be resolved
+        once rendering is complete. That promise is resolved with the instance.
+         ```js
+        App.visit('/users').then(function(instance) {
+          var view = instance.view;
+          view.appendTo('#qunit-test-fixtures');
+        });
+       ```
+         @method visit
+        @private
+      */
+      visit: function (url) {
+        var instance = this.buildInstance();
+        this.runInstanceInitializers(instance);
+
+        var renderPromise = new _emberRuntimeExtRsvp.default.Promise(function (res, rej) {
+          instance.didCreateRootView = function (view) {
+            instance.view = view;
+            res(instance);
+          };
+        });
+
+        instance.overrideRouterLocation({ location: 'none' });
+
+        return instance.handleURL(url).then(function () {
+          return renderPromise;
+        });
+      }
+    });
+  }
 
   Application.reopenClass({
     initializers: new _emberMetalEmpty_object.default(),
@@ -4914,171 +4632,6 @@ enifed('ember-application/system/application', ['exports', 'dag-map', 'container
   exports.default = Application;
 });
 // Ember.libraries, LOG_VERSION, Namespace, BOOTED
-
-// See documentation on `_autoboot()` for details
-
-// If we already have the __deprecatedInstance__ lying around, boot it to
-// avoid unnecessary work
-
-// Otherwise, build an instance and boot it. This is currently unreachable,
-// because we forced _globalsMode to === autoboot; but having this branch
-// allows us to locally toggle that flag for weeding out legacy globals mode
-// dependencies independently
-
-// TODO: App.ready() is not called when autoboot is disabled, is this correct?
-
-/**
-  Boot a new instance of `Ember.ApplicationInstance` for the current
-  application and navigate it to the given `url`. Returns a `Promise` that
-  resolves with the instance when the initial routing and rendering is
-  complete, or rejects with any error that occured during the boot process.
-   When `autoboot` is disabled, calling `visit` would first cause the
-  application to boot, which runs the application initializers.
-   This method also takes a hash of boot-time configuration options for
-  customizing the instance's behavior. See the documentation on
-  `Ember.ApplicationInstance.BootOptions` for details.
-   `Ember.ApplicationInstance.BootOptions` is an interface class that exists
-  purely to document the available options; you do not need to construct it
-  manually. Simply pass a regular JavaScript object containing of the
-  desired options:
-   ```javascript
-  MyApp.visit("/", { location: "none", rootElement: "#container" });
-  ```
-   ### Supported Scenarios
-   While the `BootOptions` class exposes a large number of knobs, not all
-  combinations of them are valid; certain incompatible combinations might
-  result in unexpected behavior.
-   For example, booting the instance in the full browser environment
-  while specifying a foriegn `document` object (e.g. `{ isBrowser: true,
-  document: iframe.contentDocument }`) does not work correctly today,
-  largely due to Ember's jQuery dependency.
-   Currently, there are three officially supported scenarios/configurations.
-  Usages outside of these scenarios are not guaranteed to work, but please
-  feel free to file bug reports documenting your experience and any issues
-  you encountered to help expand support.
-   #### Browser Applications (Manual Boot)
-   The setup is largely similar to how Ember works out-of-the-box. Normally,
-  Ember will boot a default instance for your Application on "DOM ready".
-  However, you can customize this behavior by disabling `autoboot`.
-   For example, this allows you to render a miniture demo of your application
-  into a specific area on your marketing website:
-   ```javascript
-  import MyApp from 'my-app';
-   $(function() {
-    let App = MyApp.create({ autoboot: false });
-     let options = {
-      // Override the router's location adapter to prevent it from updating
-      // the URL in the address bar
-      location: 'none',
-       // Override the default `rootElement` on the app to render into a
-      // specific `div` on the page
-      rootElement: '#demo'
-    };
-     // Start the app at the special demo URL
-    App.visit('/demo', options);
-  });
-  ````
-   Or perhaps you might want to boot two instances of your app on the same
-  page for a split-screen multiplayer experience:
-   ```javascript
-  import MyApp from 'my-app';
-   $(function() {
-    let App = MyApp.create({ autoboot: false });
-     let sessionId = MyApp.generateSessionID();
-     let player1 = App.visit(`/matches/join?name=Player+1&session=${sessionId}`, { rootElement: '#left', location: 'none' });
-    let player2 = App.visit(`/matches/join?name=Player+2&session=${sessionId}`, { rootElement: '#right', location: 'none' });
-     Promise.all([player1, player2]).then(() => {
-      // Both apps have completed the initial render
-      $('#loading').fadeOut();
-    });
-  });
-  ```
-   Do note that each app instance maintains their own registry/container, so
-  they will run in complete isolation by default.
-   #### Server-Side Rendering (also known as FastBoot)
-   This setup allows you to run your Ember app in a server environment using
-  Node.js and render its content into static HTML for SEO purposes.
-   ```javascript
-  const HTMLSerializer = new SimpleDOM.HTMLSerializer(SimpleDOM.voidMap);
-   function renderURL(url) {
-    let dom = new SimpleDOM.Document();
-    let rootElement = dom.body;
-    let options = { isBrowser: false, document: dom, rootElement: rootElement };
-     return MyApp.visit(options).then(instance => {
-      try {
-        return HTMLSerializer.serialize(rootElement.firstChild);
-      } finally {
-        instance.destroy();
-      }
-    });
-  }
-  ```
-   In this scenario, because Ember does not have access to a global `document`
-  object in the Node.js environment, you must provide one explicitly. In practice,
-  in the non-browser environment, the stand-in `document` object only need to
-  implement a limited subset of the full DOM API. The `SimpleDOM` library is known
-  to work.
-   Since there is no access to jQuery in the non-browser environment, you must also
-  specify a DOM `Element` object in the same `document` for the `rootElement` option
-  (as opposed to a selector string like `"body"`).
-   See the documentation on the `isBrowser`, `document` and `rootElement` properties
-  on `Ember.ApplicationInstance.BootOptions` for details.
-   #### Server-Side Resource Discovery
-   This setup allows you to run the routing layer of your Ember app in a server
-  environment using Node.js and completely disable rendering. This allows you
-  to simulate and discover the resources (i.e. AJAX requests) needed to fufill
-  a given request and eagerly "push" these resources to the client.
-   ```app/initializers/network-service.js
-  import BrowserNetworkService from 'app/services/network/browser';
-  import NodeNetworkService from 'app/services/network/node';
-   // Inject a (hypothetical) service for abstracting all AJAX calls and use
-  // the appropiate implementaion on the client/server. This also allows the
-  // server to log all the AJAX calls made during a particular request and use
-  // that for resource-discovery purpose.
-   export function initialize(application) {
-    if (window) { // browser
-      application.register('service:network', BrowserNetworkService);
-    } else { // node
-      application.register('service:network', NodeNetworkService);
-    }
-     application.inject('route', 'network', 'service:network');
-  };
-   export default {
-    name: 'network-service',
-    initialize: initialize
-  };
-  ```
-   ```app/routes/post.js
-  import Ember from 'ember';
-   // An example of how the (hypothetical) service is used in routes.
-   export default Ember.Route.extend({
-    model(params) {
-      return this.network.fetch(`/api/posts/${params.post_id}.json`);
-    },
-     afterModel(post) {
-      if (post.isExternalContent) {
-        return this.network.fetch(`/api/external/?url=${post.externalURL}`);
-      } else {
-        return post;
-      }
-    }
-  });
-  ```
-   ```javascript
-  // Finally, put all the pieces together
-   function discoverResourcesFor(url) {
-    return MyApp.visit(url, { isBrowser: false, shouldRender: false }).then(instance => {
-      let networkService = instance.lookup('service:network');
-      return networkService.requests; // => { "/api/posts/123.json": "..." }
-    });
-  }
-  ```
-   @method visit
-  @param url {String} The initial URL to navigate to
-  @param options {Ember.ApplicationInstance.BootOptions}
-  @return {Promise<Ember.ApplicationInstance, Error>}
-  @private
-*/
 enifed('ember-application/system/resolver', ['exports', 'ember-metal/core', 'ember-metal/debug', 'ember-metal/property_get', 'ember-runtime/system/string', 'ember-runtime/system/object', 'ember-runtime/system/namespace', 'ember-htmlbars/helpers', 'ember-application/utils/validate-type', 'ember-metal/dictionary'], function (exports, _emberMetalCore, _emberMetalDebug, _emberMetalProperty_get, _emberRuntimeSystemString, _emberRuntimeSystemObject, _emberRuntimeSystemNamespace, _emberHtmlbarsHelpers, _emberApplicationUtilsValidateType, _emberMetalDictionary) {
   /**
   @module ember
@@ -8437,8 +7990,16 @@ enifed('ember-htmlbars/keywords/component', ['exports', 'htmlbars-runtime/hooks'
   */
 
   exports.default = function (morph, env, scope, params, hash, template, inverse, visitor) {
-    _htmlbarsRuntimeHooks.keyword('@element_component', morph, env, scope, params, hash, template, inverse, visitor);
-    return true;
+    if (_emberMetalFeatures.default('ember-contextual-components')) {
+      if (morph) {
+        _htmlbarsRuntimeHooks.keyword('@element_component', morph, env, scope, params, hash, template, inverse, visitor);
+        return true;
+      }
+      return _emberHtmlbarsKeywordsClosureComponent.default(env, params, hash);
+    } else {
+      _htmlbarsRuntimeHooks.keyword('@element_component', morph, env, scope, params, hash, template, inverse, visitor);
+      return true;
+    }
   };
 });
 enifed('ember-htmlbars/keywords/debugger', ['exports', 'ember-metal/debug'], function (exports, _emberMetalDebug) {
@@ -9115,7 +8676,7 @@ enifed('ember-htmlbars/keywords/outlet', ['exports', 'ember-metal/debug', 'ember
 
   'use strict';
 
-  _emberHtmlbarsTemplatesTopLevelView.default.meta.revision = 'Ember@2.2.0-beta.1';
+  _emberHtmlbarsTemplatesTopLevelView.default.meta.revision = 'Ember@2.2.0-canary+328112bd';
 
   /**
     The `{{outlet}}` helper lets you specify where a child routes will render in
@@ -9223,6 +8784,10 @@ enifed('ember-htmlbars/keywords/outlet', ['exports', 'ember-metal/debug', 'ember
       }
 
       var Component;
+
+      if (_emberMetalFeatures.default('ember-routing-routable-components')) {
+        Component = outletState.render.Component;
+      }
 
       var options;
       var attrs = {};
@@ -12298,6 +11863,10 @@ enifed('ember-htmlbars', ['exports', 'ember-metal/core', 'ember-metal/features',
   _emberHtmlbarsHelpers.registerHelper('-join-classes', _emberHtmlbarsHelpersJoinClasses.default);
   _emberHtmlbarsHelpers.registerHelper('-html-safe', _emberHtmlbarsHelpersHtmlSafe.default);
 
+  if (_emberMetalFeatures.default('ember-contextual-components')) {
+    _emberHtmlbarsHelpers.registerHelper('hash', _emberHtmlbarsHelpersHash.default);
+  }
+
   if (_emberMetalCore.default.ENV._ENABLE_LEGACY_VIEW_SUPPORT) {
     _emberHtmlbarsHelpers.registerHelper('-legacy-each-with-controller', _emberHtmlbarsHelpersLegacyEachWithController.default);
     _emberHtmlbarsHelpers.registerHelper('-legacy-each-with-keyword', _emberHtmlbarsHelpersLegacyEachWithKeyword.default);
@@ -12311,6 +11880,10 @@ enifed('ember-htmlbars', ['exports', 'ember-metal/core', 'ember-metal/features',
     registerPlugin: _emberTemplateCompiler.registerPlugin,
     DOMHelper: _emberHtmlbarsSystemDomHelper.default
   };
+
+  if (_emberMetalFeatures.default('ember-htmlbars-component-generation')) {
+    _emberMetalCore.default.GlimmerComponent = _emberHtmlbarsGlimmerComponent.default;
+  }
 
   _emberHtmlbarsHelper.default.helper = _emberHtmlbarsHelper.helper;
   _emberMetalCore.default.Helper = _emberHtmlbarsHelper.default;
@@ -14706,7 +14279,7 @@ enifed('ember-metal/core', ['exports'], function (exports) {
   
     @class Ember
     @static
-    @version 2.2.0-beta.1
+    @version 2.2.0-canary+328112bd
     @public
   */
 
@@ -14750,11 +14323,11 @@ enifed('ember-metal/core', ['exports'], function (exports) {
   
     @property VERSION
     @type String
-    @default '2.2.0-beta.1'
+    @default '2.2.0-canary+328112bd'
     @static
     @public
   */
-  Ember.VERSION = '2.2.0-beta.1';
+  Ember.VERSION = '2.2.0-canary+328112bd';
 
   /**
     The hash of environment variables used to control various configuration
@@ -15579,7 +15152,7 @@ enifed('ember-metal/features', ['exports', 'ember-metal/core', 'ember-metal/assi
     @since 1.1.0
     @public
   */
-  var FEATURES = _emberMetalAssign.default({}, _emberMetalCore.default.ENV.FEATURES);exports.FEATURES = FEATURES;
+  var FEATURES = _emberMetalAssign.default({"features-stripped-test":null,"ember-htmlbars-component-generation":null,"ember-testing-checkbox-helpers":null,"ember-application-visit":null,"ember-routing-route-configured-query-params":null,"ember-libraries-isregistered":null,"ember-routing-routable-components":null,"ember-metal-ember-assign":null,"ember-contextual-components":null}, _emberMetalCore.default.ENV.FEATURES);exports.FEATURES = FEATURES;
   // jshint ignore:line
 
   /**
@@ -16222,6 +15795,12 @@ enifed('ember-metal/libraries', ['exports', 'ember-metal/debug', 'ember-metal/fe
       }
     }
   };
+
+  if (_emberMetalFeatures.default('ember-libraries-isregistered')) {
+    Libraries.prototype.isRegistered = function (name) {
+      return !!this._getLibraryByName(name);
+    };
+  }
 
   exports.default = Libraries;
 });
@@ -16894,6 +16473,7 @@ enifed('ember-metal/merge', ['exports', 'ember-metal/debug', 'ember-metal/featur
   */
 
   function merge(original, updates) {
+    if (_emberMetalFeatures.default('ember-metal-ember-assign')) {}
 
     if (!updates || typeof updates !== 'object') {
       return original;
@@ -17256,14 +16836,10 @@ enifed('ember-metal/meta', ['exports', 'ember-metal/meta_listeners', 'ember-meta
       ret = new Meta(obj, ret);
     }
 
-    // if `null` already, just set it to the new value
-    // otherwise define property first
-    if (obj.__ember_meta__ !== null) {
-      if (obj.__defineNonEnumerable) {
-        obj.__defineNonEnumerable(EMBER_META_PROPERTY);
-      } else {
-        Object.defineProperty(obj, '__ember_meta__', META_DESC);
-      }
+    if (obj.__defineNonEnumerable) {
+      obj.__defineNonEnumerable(EMBER_META_PROPERTY);
+    } else {
+      Object.defineProperty(obj, '__ember_meta__', META_DESC);
     }
     obj.__ember_meta__ = ret;
 
@@ -17800,7 +17376,7 @@ enifed('ember-metal/mixin', ['exports', 'ember-metal/core', 'ember-metal/error',
     // * Set up _super wrapping if necessary
     // * Set up computed property descriptors
     // * Copying `toString` in broken browsers
-    mergeMixins(mixins, m, descs, values, obj, keys);
+    mergeMixins(mixins, _emberMetalMeta.meta(obj), descs, values, obj, keys);
 
     for (var i = 0, l = keys.length; i < l; i++) {
       key = keys[i];
@@ -20207,7 +19783,7 @@ enifed('ember-metal/streams/proxy-stream', ['exports', 'ember-runtime/system/obj
 
   exports.default = ProxyStream;
 });
-enifed('ember-metal/streams/stream', ['exports', 'ember-metal/core', 'ember-metal/assign', 'ember-metal/debug', 'ember-metal/path_cache', 'ember-metal/observer', 'ember-metal/streams/utils', 'ember-metal/empty_object', 'ember-metal/streams/subscriber', 'ember-metal/streams/dependency', 'ember-metal/utils'], function (exports, _emberMetalCore, _emberMetalAssign, _emberMetalDebug, _emberMetalPath_cache, _emberMetalObserver, _emberMetalStreamsUtils, _emberMetalEmpty_object, _emberMetalStreamsSubscriber, _emberMetalStreamsDependency, _emberMetalUtils) {
+enifed('ember-metal/streams/stream', ['exports', 'ember-metal/core', 'ember-metal/assign', 'ember-metal/debug', 'ember-metal/path_cache', 'ember-metal/observer', 'ember-metal/streams/utils', 'ember-metal/empty_object', 'ember-metal/streams/subscriber', 'ember-metal/streams/dependency'], function (exports, _emberMetalCore, _emberMetalAssign, _emberMetalDebug, _emberMetalPath_cache, _emberMetalObserver, _emberMetalStreamsUtils, _emberMetalEmpty_object, _emberMetalStreamsSubscriber, _emberMetalStreamsDependency) {
   'use strict';
 
   exports.wrap = wrap;
@@ -20244,8 +19820,6 @@ enifed('ember-metal/streams/stream', ['exports', 'ember-metal/core', 'ember-meta
       this.dependencyHead = null;
       this.dependencyTail = null;
       this.observedProxy = null;
-      this.__ember_meta__ = null;
-      this[_emberMetalUtils.GUID_KEY] = null;
     },
 
     _makeChildStream: function (key) {
@@ -22208,7 +21782,12 @@ enifed('ember-metal', ['exports', 'ember-metal/core', 'ember-metal/debug', 'embe
   _emberMetalCore.default.isBlank = _emberMetalIs_blank.default;
   _emberMetalCore.default.isPresent = _emberMetalIs_present.default;
 
-  _emberMetalCore.default.merge = _emberMetalMerge.default;
+  if (_emberMetalFeatures.default('ember-metal-ember-assign')) {
+    _emberMetalCore.default.assign = Object.assign || _emberMetalAssign.default;
+    _emberMetalCore.default.merge = _emberMetalMerge.default;
+  } else {
+    _emberMetalCore.default.merge = _emberMetalMerge.default;
+  }
 
   _emberMetalCore.default.FEATURES = _emberMetalFeatures.FEATURES;
   _emberMetalCore.default.FEATURES.isEnabled = _emberMetalFeatures.default;
@@ -23881,6 +23460,10 @@ enifed('ember-routing/system/route', ['exports', 'ember-metal/core', 'ember-meta
         var controllerDefinedQueryParameterConfiguration = _emberMetalProperty_get.get(controllerProto, 'queryParams');
         var normalizedControllerQueryParameterConfiguration = _emberRoutingUtils.normalizeControllerQueryParams(controllerDefinedQueryParameterConfiguration);
         combinedQueryParameterConfiguration = mergeEachQueryParams(normalizedControllerQueryParameterConfiguration, queryParameterConfiguraton);
+
+        if (_emberMetalFeatures.default('ember-routing-route-configured-query-params')) {
+          if (controllerDefinedQueryParameterConfiguration.length) {}
+        }
       } else if (hasRouterDefinedQueryParams) {
         // the developer has not defined a controller but *has* supplied route query params.
         // Generate a class for them so we can later insert default values
@@ -23906,6 +23489,19 @@ enifed('ember-routing/system/route', ['exports', 'ember-metal/core', 'ember-meta
         }
 
         var desc = combinedQueryParameterConfiguration[propName];
+
+        if (_emberMetalFeatures.default('ember-routing-route-configured-query-params')) {
+          // apply default values to controllers
+          // detect that default value defined on router config
+          if (desc.hasOwnProperty('defaultValue')) {
+            // detect that property was not defined on controller
+            if (controllerProto[propName] === undefined) {
+              controllerProto[propName] = desc.defaultValue;
+            } else {
+              deprecateQueryParamDefaultValuesSetOnController(controllerName, this.routeName, propName);
+            }
+          }
+        }
 
         var scope = desc.scope || 'model';
         var parts;
@@ -25700,6 +25296,17 @@ enifed('ember-routing/system/route', ['exports', 'ember-metal/core', 'ember-meta
     };
 
     var Component = undefined;
+    if (_emberMetalFeatures.default('ember-routing-routable-components')) {
+      var componentName = options && options.component || namePassed && name || route.componentName || name;
+      var componentLookup = route.container.lookup('component-lookup:main');
+      Component = componentLookup.lookupFactory(componentName);
+      var isGlimmerComponent = Component && Component.proto().isGlimmerComponent;
+      if (!template && !ViewClass && Component && isGlimmerComponent) {
+        renderOptions.Component = Component;
+        renderOptions.ViewClass = undefined;
+        renderOptions.attrs = { model: _emberMetalProperty_get.get(controller, 'model') };
+      }
+    }
 
     if (!ViewClass && !template && !Component) {
       if (LOG_VIEW_LOOKUPS) {
@@ -25765,12 +25372,16 @@ enifed('ember-routing/system/route', ['exports', 'ember-metal/core', 'ember-meta
     var keysAlreadyMergedOrSkippable;
     var qps = {};
 
-    keysAlreadyMergedOrSkippable = {
-      defaultValue: true,
-      type: true,
-      scope: true,
-      as: true
-    };
+    if (_emberMetalFeatures.default('ember-routing-route-configured-query-params')) {
+      keysAlreadyMergedOrSkippable = {};
+    } else {
+      keysAlreadyMergedOrSkippable = {
+        defaultValue: true,
+        type: true,
+        scope: true,
+        as: true
+      };
+    }
 
     // first loop over all controller qps, merging them with any matching route qps
     // into a new empty object to avoid mutating.
@@ -25815,11 +25426,6 @@ enifed('ember-routing/system/route', ['exports', 'ember-metal/core', 'ember-meta
   exports.default = Route;
 });
 // FEATURES, A, deprecate, assert, Logger
-
-// apply default values to controllers
-// detect that default value defined on router config
-
-// detect that property was not defined on controller
 enifed('ember-routing/system/router', ['exports', 'ember-metal/logger', 'ember-metal/debug', 'ember-metal/error', 'ember-metal/property_get', 'ember-metal/property_set', 'ember-metal/properties', 'ember-metal/empty_object', 'ember-metal/computed', 'ember-metal/assign', 'ember-metal/run_loop', 'ember-runtime/system/object', 'ember-runtime/mixins/evented', 'ember-routing/system/dsl', 'ember-routing/location/api', 'ember-routing/utils', 'ember-routing/system/router_state', 'router', 'router/transition'], function (exports, _emberMetalLogger, _emberMetalDebug, _emberMetalError, _emberMetalProperty_get, _emberMetalProperty_set, _emberMetalProperties, _emberMetalEmpty_object, _emberMetalComputed, _emberMetalAssign, _emberMetalRun_loop, _emberRuntimeSystemObject, _emberRuntimeMixinsEvented, _emberRoutingSystemDsl, _emberRoutingLocationApi, _emberRoutingUtils, _emberRoutingSystemRouter_state, _router4, _routerTransition) {
   'use strict';
 
@@ -28284,7 +27890,7 @@ enifed('ember-routing-views/components/link-to', ['exports', 'ember-metal/logger
 
   'use strict';
 
-  _emberHtmlbarsTemplatesLinkTo.default.meta.revision = 'Ember@2.2.0-beta.1';
+  _emberHtmlbarsTemplatesLinkTo.default.meta.revision = 'Ember@2.2.0-canary+328112bd';
 
   /**
     `Ember.LinkComponent` renders an element whose `click` event triggers a
@@ -28762,7 +28368,7 @@ enifed('ember-routing-views/views/outlet', ['exports', 'ember-views/views/view',
 
   'use strict';
 
-  _emberHtmlbarsTemplatesTopLevelView.default.meta.revision = 'Ember@2.2.0-beta.1';
+  _emberHtmlbarsTemplatesTopLevelView.default.meta.revision = 'Ember@2.2.0-canary+328112bd';
 
   var CoreOutletView = _emberViewsViewsView.default.extend({
     defaultTemplate: _emberHtmlbarsTemplatesTopLevelView.default,
@@ -34394,7 +34000,7 @@ enifed('ember-runtime/system/core_object', ['exports', 'ember-metal', 'ember-met
     // possible.
 
     var wasApplied = false;
-    var initProperties;
+    var initMixins, initProperties;
 
     var Class = function () {
       if (!wasApplied) {
@@ -34409,6 +34015,12 @@ enifed('ember-runtime/system/core_object', ['exports', 'ember-metal', 'ember-met
       var m = _emberMetalMeta.meta(this);
       var proto = m.proto;
       m.proto = this;
+      if (initMixins) {
+        // capture locally so we can clear the closed over variable
+        var mixins = initMixins;
+        initMixins = null;
+        _emberMetalUtils.apply(this, this.reopen, mixins);
+      }
       if (initProperties) {
         // capture locally so we can clear the closed over variable
         var props = initProperties;
@@ -34507,7 +34119,9 @@ enifed('ember-runtime/system/core_object', ['exports', 'ember-metal', 'ember-met
 
       wasApplied = false;
     };
-
+    Class._initMixins = function (args) {
+      initMixins = args;
+    };
     Class._initProperties = function (args) {
       initProperties = args;
     };
@@ -35192,7 +34806,7 @@ enifed('ember-runtime/system/each_proxy', ['exports', 'ember-metal/debug', 'embe
   function EachProxy(content) {
     this._content = content;
     this._keys = undefined;
-    this.__ember_meta__ = null;
+    this.__ember_meta__ = undefined;
   }
 
   EachProxy.prototype = {
@@ -35956,22 +35570,13 @@ enifed('ember-runtime/system/string', ['exports', 'ember-metal/core', 'ember-met
     });
   });
 
-  var STRING_CLASSIFY_REGEXP_1 = /^(\-|_)+(.)?/;
-  var STRING_CLASSIFY_REGEXP_2 = /(.)(\-|\_|\.|\s)+(.)?/g;
-  var STRING_CLASSIFY_REGEXP_3 = /(^|\/|\.)([a-z])/g;
+  var STRING_CLASSIFY_REGEXP_1 = /(\-|\_|\.|\s)+(.)?/g;
+  var STRING_CLASSIFY_REGEXP_2 = /(^|\/|\.)([a-z])/g;
 
   var CLASSIFY_CACHE = new _emberMetalCache.default(1000, function (str) {
-    var replace1 = function (match, separator, chr) {
-      return chr ? '_' + chr.toUpperCase() : '';
-    };
-    var replace2 = function (match, initialChar, separator, chr) {
-      return initialChar + (chr ? chr.toUpperCase() : '');
-    };
-    var parts = str.split('/');
-    for (var i = 0, len = parts.length; i < len; i++) {
-      parts[i] = parts[i].replace(STRING_CLASSIFY_REGEXP_1, replace1).replace(STRING_CLASSIFY_REGEXP_2, replace2);
-    }
-    return parts.join('/').replace(STRING_CLASSIFY_REGEXP_3, function (match, separator, chr) {
+    return str.replace(STRING_CLASSIFY_REGEXP_1, function (match, separator, chr) {
+      return chr ? chr.toUpperCase() : '';
+    }).replace(STRING_CLASSIFY_REGEXP_2, function (match, separator, chr) {
       return match.toUpperCase();
     });
   });
@@ -37336,6 +36941,9 @@ enifed('ember-template-compiler/plugins/transform-top-level-components', ['expor
 
     if (lastComponentNode.type === 'ComponentNode') {
       componentCallback(lastComponentNode);
+    } else if (_emberMetalFeatures.default('ember-htmlbars-component-generation')) {
+      var component = elementCallback(lastComponentNode);
+      body.splice(lastIndex, 1, component);
     }
   }
 
@@ -37488,6 +37096,9 @@ enifed('ember-template-compiler/system/compile_options', ['exports', 'ember-meta
 
   exports.default = function (_options) {
     var disableComponentGeneration = true;
+    if (_emberMetalFeatures.default('ember-htmlbars-component-generation')) {
+      disableComponentGeneration = false;
+    }
 
     var options = undefined;
     // When calling `Ember.Handlebars.compile()` a second argument of `true`
@@ -37513,7 +37124,7 @@ enifed('ember-template-compiler/system/compile_options', ['exports', 'ember-meta
     options.buildMeta = function buildMeta(program) {
       return {
         fragmentReason: fragmentReason(program),
-        revision: 'Ember@2.2.0-beta.1',
+        revision: 'Ember@2.2.0-canary+328112bd',
         loc: program.loc,
         moduleName: options.moduleName
       };
@@ -38470,6 +38081,16 @@ enifed('ember-views/mixins/legacy_view_support', ['exports', 'ember-metal/debug'
 
     afterRender: function (buffer) {},
 
+    walkChildViews: function (callback) {
+      var childViews = this.childViews.slice();
+
+      while (childViews.length) {
+        var view = childViews.pop();
+        callback(view);
+        childViews.push.apply(childViews, view.childViews);
+      }
+    },
+
     mutateChildViews: function (callback) {
       var childViews = _emberMetalProperty_get.get(this, 'childViews');
       var idx = childViews.length;
@@ -39134,7 +38755,7 @@ enifed('ember-views/mixins/view_context_support', ['exports', 'ember-metal/mixin
     }),
 
     _legacyControllerDidChange: _emberMetalMixin.observer('controller', function () {
-      this.childViews.forEach(function (view) {
+      this.walkChildViews(function (view) {
         return view.notifyPropertyChange('controller');
       });
     }),
@@ -39170,7 +38791,7 @@ enifed('ember-views/mixins/view_state_support', ['exports', 'ember-metal/debug',
 
   exports.default = ViewStateSupport;
 });
-enifed('ember-views/mixins/view_support', ['exports', 'ember-metal/debug', 'ember-metal/error', 'ember-metal/property_get', 'ember-metal/run_loop', 'ember-metal/observer', 'ember-metal/utils', 'ember-metal/computed', 'ember-metal/mixin', 'ember-runtime/system/core_object', 'ember-metal/features', 'ember-views/system/jquery'], function (exports, _emberMetalDebug, _emberMetalError, _emberMetalProperty_get, _emberMetalRun_loop, _emberMetalObserver, _emberMetalUtils, _emberMetalComputed, _emberMetalMixin, _emberRuntimeSystemCore_object, _emberMetalFeatures, _emberViewsSystemJquery) {
+enifed('ember-views/mixins/view_support', ['exports', 'ember-metal/debug', 'ember-metal/error', 'ember-metal/property_get', 'ember-metal/run_loop', 'ember-metal/observer', 'ember-metal/utils', 'ember-metal/computed', 'ember-metal/mixin', 'ember-runtime/system/core_object', 'ember-views/system/jquery'], function (exports, _emberMetalDebug, _emberMetalError, _emberMetalProperty_get, _emberMetalRun_loop, _emberMetalObserver, _emberMetalUtils, _emberMetalComputed, _emberMetalMixin, _emberRuntimeSystemCore_object, _emberViewsSystemJquery) {
   'use strict';
 
   var _Mixin$create;
@@ -41513,7 +41134,7 @@ enifed('ember-views/views/collection_view', ['exports', 'ember-metal/core', 'emb
 enifed('ember-views/views/container_view', ['exports', 'ember-metal/core', 'ember-metal/debug', 'ember-runtime/mixins/mutable_array', 'ember-runtime/system/native_array', 'ember-views/views/view', 'ember-metal/property_get', 'ember-metal/property_set', 'ember-metal/mixin', 'ember-metal/events', 'ember-htmlbars/templates/container-view'], function (exports, _emberMetalCore, _emberMetalDebug, _emberRuntimeMixinsMutable_array, _emberRuntimeSystemNative_array, _emberViewsViewsView, _emberMetalProperty_get, _emberMetalProperty_set, _emberMetalMixin, _emberMetalEvents, _emberHtmlbarsTemplatesContainerView) {
   'use strict';
 
-  _emberHtmlbarsTemplatesContainerView.default.meta.revision = 'Ember@2.2.0-beta.1';
+  _emberHtmlbarsTemplatesContainerView.default.meta.revision = 'Ember@2.2.0-canary+328112bd';
 
   /**
   @module ember
@@ -43699,8 +43320,7 @@ enifed('ember-views/views/view', ['exports', 'ember-metal/core', 'ember-metal/de
 
   _emberMetalDeprecate_property.deprecateProperty(View.prototype, 'currentState', '_currentState', {
     id: 'ember-view.current-state',
-    until: '2.3.0',
-    url: 'http://emberjs.com/deprecations/v2.x/#toc_ember-component-currentstate'
+    until: '2.3.0'
   });
 
   // jscs:enable validateIndentation
@@ -46823,25 +46443,10 @@ enifed('morph-range', ['exports', 'morph-range/utils'], function (exports, _morp
       case 'boolean':
       case 'number':
         return this.setText(content.toString());
-      case 'function':
-        raiseCannotBindToFunction(content);
       default:
         throw new TypeError('unsupported content');
     }
   };
-
-  function raiseCannotBindToFunction(content) {
-    var functionName = content.name;
-    var message;
-
-    if (functionName) {
-      message = 'Unsupported Content: Cannot bind to function `' + functionName + '`';
-    } else {
-      message = 'Unsupported Content: Cannot bind to function';
-    }
-
-    throw new TypeError(message);
-  }
 
   Morph.prototype.clear = function Morph$clear() {
     var node = this.setNode(this.domHelper.createComment(''));
