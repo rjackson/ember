@@ -6,7 +6,7 @@
  *            Portions Copyright 2008-2011 Apple Inc. All rights reserved.
  * @license   Licensed under MIT license
  *            See https://raw.github.com/emberjs/ember.js/master/LICENSE
- * @version   2.4.0-canary+3d1cf7b6
+ * @version   2.4.0-canary+9a63d4aa
  */
 
 var enifed, requireModule, require, requirejs, Ember;
@@ -1293,7 +1293,8 @@ enifed('container/container', ['exports', 'ember-metal/core', 'ember-metal/debug
       @private
      @method lookup
      @param {String} fullName
-     @param {Object} options
+     @param {Object} [options]
+     @param {String} [options.source] The fullname of the request source (used for local lookup)
      @return {any}
      */
     lookup: function (fullName, options) {
@@ -1305,10 +1306,12 @@ enifed('container/container', ['exports', 'ember-metal/core', 'ember-metal/debug
       @private
      @method lookupFactory
      @param {String} fullName
+     @param {Object} [options]
+     @param {String} [options.source] The fullname of the request source (used for local lookup)
      @return {any}
      */
-    lookupFactory: function (fullName) {
-      return factoryFor(this, this.registry.normalize(fullName));
+    lookupFactory: function (fullName, options) {
+      return factoryFor(this, this.registry.normalize(fullName), options);
     },
 
     /**
@@ -1359,8 +1362,20 @@ enifed('container/container', ['exports', 'ember-metal/core', 'ember-metal/debug
     return container.registry.getOption(fullName, 'singleton') !== false;
   }
 
-  function lookup(container, fullName, options) {
-    options = options || {};
+  function lookup(container, _fullName, _options) {
+    var options = _options || {};
+    var fullName = _fullName;
+
+    if (_emberMetalFeatures.default('ember-htmlbars-local-lookup')) {
+      if (options && options.source) {
+        fullName = container.registry.expandLocalLookup(fullName, options);
+
+        // if expandLocalLookup returns falsey, we do not support local lookup
+        if (!fullName) {
+          return;
+        }
+      }
+    }
 
     if (container.cache[fullName] && options.singleton !== false) {
       return container.cache[fullName];
@@ -1415,12 +1430,25 @@ enifed('container/container', ['exports', 'ember-metal/core', 'ember-metal/debug
     return hash;
   }
 
-  function factoryFor(container, fullName) {
+  function factoryFor(container, _fullName, options) {
+    var registry = container.registry;
+    var fullName = _fullName;
+
+    if (_emberMetalFeatures.default('ember-htmlbars-local-lookup')) {
+      if (options && options.source) {
+        fullName = registry.expandLocalLookup(fullName, options);
+
+        // if expandLocalLookup returns falsey, we do not support local lookup
+        if (!fullName) {
+          return;
+        }
+      }
+    }
+
     var cache = container.factoryCache;
     if (cache[fullName]) {
       return cache[fullName];
     }
-    var registry = container.registry;
     var factory = registry.resolve(fullName);
     if (factory === undefined) {
       return;
@@ -1691,7 +1719,7 @@ enifed('container/owner', ['exports', 'ember-metal/symbol'], function (exports, 
     object[OWNER] = owner;
   }
 });
-enifed('container/registry', ['exports', 'ember-metal/debug', 'ember-metal/dictionary', 'ember-metal/assign', 'container/container'], function (exports, _emberMetalDebug, _emberMetalDictionary, _emberMetalAssign, _containerContainer) {
+enifed('container/registry', ['exports', 'ember-metal/features', 'ember-metal/debug', 'ember-metal/dictionary', 'ember-metal/assign', 'container/container'], function (exports, _emberMetalFeatures, _emberMetalDebug, _emberMetalDictionary, _emberMetalAssign, _containerContainer) {
   'use strict';
 
   var VALID_FULL_NAME_REGEXP = /^[^:]+.+:[^:]+$/;
@@ -1727,6 +1755,7 @@ enifed('container/registry', ['exports', 'ember-metal/debug', 'ember-metal/dicti
     this._factoryTypeInjections = _emberMetalDictionary.default(null);
     this._factoryInjections = _emberMetalDictionary.default(null);
 
+    this._localLookupCache = _emberMetalDictionary.default(null);
     this._normalizeCache = _emberMetalDictionary.default(null);
     this._resolveCache = _emberMetalDictionary.default(null);
     this._failCache = _emberMetalDictionary.default(null);
@@ -1875,6 +1904,7 @@ enifed('container/registry', ['exports', 'ember-metal/debug', 'ember-metal/dicti
 
       var normalizedName = this.normalize(fullName);
 
+      delete this._localLookupCache[normalizedName];
       delete this.registrations[normalizedName];
       delete this._resolveCache[normalizedName];
       delete this._failCache[normalizedName];
@@ -1905,12 +1935,16 @@ enifed('container/registry', ['exports', 'ember-metal/debug', 'ember-metal/dicti
       @private
      @method resolve
      @param {String} fullName
+     @param {Object} [options]
+     @param {String} [options.source] the fullname of the request source (used for local lookups)
      @return {Function} fullName's factory
      */
-    resolve: function (fullName) {
-      var factory = resolve(this, this.normalize(fullName));
+    resolve: function (fullName, options) {
+      var factory = resolve(this, this.normalize(fullName), options);
       if (factory === undefined && this.fallback) {
-        factory = this.fallback.resolve(fullName);
+        var _fallback;
+
+        factory = (_fallback = this.fallback).resolve.apply(_fallback, arguments);
       }
       return factory;
     },
@@ -1987,10 +2021,18 @@ enifed('container/registry', ['exports', 'ember-metal/debug', 'ember-metal/dicti
       @private
      @method has
      @param {String} fullName
+     @param {Object} [options]
+     @param {String} [options.source] the fullname of the request source (used for local lookups)
      @return {Boolean}
      */
-    has: function (fullName) {
-      return has(this, this.normalize(fullName));
+    has: function (fullName, options) {
+
+      var source = undefined;
+      if (_emberMetalFeatures.default('ember-htmlbars-local-lookup')) {
+        source = options && options.source && this.normalize(options.source);
+      }
+
+      return has(this, this.normalize(fullName), source);
     },
 
     /**
@@ -2351,7 +2393,70 @@ enifed('container/registry', ['exports', 'ember-metal/debug', 'ember-metal/dicti
     };
   }
 
-  function resolve(registry, normalizedName) {
+  if (_emberMetalFeatures.default('ember-htmlbars-local-lookup')) {
+    /**
+      Given a fullName and a source fullName returns the fully resolved
+      fullName. Used to allow for local lookup.
+        ```javascript
+      var registry = new Registry();
+       // the twitter factory is added to the module system
+      registry.expandLocalLookup('component:post-title', 'template:post) // => component:post/post-title
+      ```
+       @private
+      @method expandLocalLookup
+      @param {String} fullName
+      @param {Object} [options]
+      @param {String} [options.source] the fullname of the request source (used for local lookups)
+      @return {String} fullName
+    */
+    Registry.prototype.expandLocalLookup = function Registry_expandLocalLookup(fullName, options) {
+      if (this.resolver && this.resolver.expandLocalLookup) {
+
+        var normalizedFullName = this.normalize(fullName);
+        var normalizedSource = this.normalize(options.source);
+
+        return expandLocalLookup(this, normalizedFullName, normalizedSource);
+      } else if (this.fallback) {
+        return this.fallback.expandLocalLookup(fullName, options);
+      } else {
+        return null;
+      }
+    };
+  }
+
+  function expandLocalLookup(registry, normalizedName, normalizedSource) {
+    var cache = registry._localLookupCache;
+    var normalizedNameCache = cache[normalizedName];
+
+    if (!normalizedNameCache) {
+      normalizedNameCache = cache[normalizedName] = _emberMetalDictionary.default(null);
+    }
+
+    var cached = normalizedNameCache[normalizedSource];
+
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    var expanded = registry.resolver.expandLocalLookup(normalizedName, normalizedSource);
+
+    return normalizedNameCache[normalizedSource] = expanded;
+  }
+
+  function resolve(registry, normalizedName, options) {
+    if (_emberMetalFeatures.default('ember-htmlbars-local-lookup')) {
+      if (options && options.source) {
+        // when `source` is provided expand normalizedName
+        // and source into the full normalizedName
+        normalizedName = registry.expandLocalLookup(normalizedName, options);
+
+        // if expandLocalLookup returns falsey, we do not support local lookup
+        if (!normalizedName) {
+          return;
+        }
+      }
+    }
+
     var cached = registry._resolveCache[normalizedName];
     if (cached) {
       return cached;
@@ -2377,8 +2482,8 @@ enifed('container/registry', ['exports', 'ember-metal/debug', 'ember-metal/dicti
     return resolved;
   }
 
-  function has(registry, fullName) {
-    return registry.resolve(fullName) !== undefined;
+  function has(registry, fullName, source) {
+    return registry.resolve(fullName, { source: source }) !== undefined;
   }
 
   exports.default = Registry;
@@ -5597,8 +5702,10 @@ enifed('ember-application/system/resolver', ['exports', 'ember-metal/debug', 'em
       var name = fullNameWithoutType;
       var namespace = _emberMetalProperty_get.get(this, 'namespace');
       var root = namespace;
+      var lastSlashIndex = name.lastIndexOf('/');
+      var dirname = lastSlashIndex !== -1 ? name.slice(0, lastSlashIndex) : null;
 
-      if (type !== 'template' && name.indexOf('/') !== -1) {
+      if (type !== 'template' && lastSlashIndex !== -1) {
         var parts = name.split('/');
         name = parts[parts.length - 1];
         var namespaceName = _emberRuntimeSystemString.capitalize(parts.slice(0, -1).join('.'));
@@ -5615,6 +5722,7 @@ enifed('ember-application/system/resolver', ['exports', 'ember-metal/debug', 'em
         fullName: fullName,
         type: type,
         fullNameWithoutType: fullNameWithoutType,
+        dirname: dirname,
         name: name,
         root: root,
         resolveMethodName: 'resolve' + resolveMethodName
@@ -7521,7 +7629,7 @@ enifed("ember-htmlbars/hooks/cleanup-render-node", ["exports"], function (export
     }
   }
 });
-enifed('ember-htmlbars/hooks/component', ['exports', 'ember-metal/debug', 'ember-htmlbars/node-managers/component-node-manager', 'ember-views/system/build-component-template', 'ember-htmlbars/utils/lookup-component', 'ember-metal/cache', 'ember-htmlbars/system/lookup-helper', 'ember-htmlbars/keywords/closure-component'], function (exports, _emberMetalDebug, _emberHtmlbarsNodeManagersComponentNodeManager, _emberViewsSystemBuildComponentTemplate, _emberHtmlbarsUtilsLookupComponent, _emberMetalCache, _emberHtmlbarsSystemLookupHelper, _emberHtmlbarsKeywordsClosureComponent) {
+enifed('ember-htmlbars/hooks/component', ['exports', 'ember-metal/features', 'ember-metal/debug', 'ember-htmlbars/node-managers/component-node-manager', 'ember-views/system/build-component-template', 'ember-htmlbars/utils/lookup-component', 'ember-metal/cache', 'ember-htmlbars/system/lookup-helper', 'ember-htmlbars/keywords/closure-component'], function (exports, _emberMetalFeatures, _emberMetalDebug, _emberHtmlbarsNodeManagersComponentNodeManager, _emberViewsSystemBuildComponentTemplate, _emberHtmlbarsUtilsLookupComponent, _emberMetalCache, _emberHtmlbarsSystemLookupHelper, _emberHtmlbarsKeywordsClosureComponent) {
   'use strict';
 
   exports.default = componentHook;
@@ -7609,7 +7717,17 @@ enifed('ember-htmlbars/hooks/component', ['exports', 'ember-metal/debug', 'ember
     var component = undefined,
         layout = undefined;
     if (isDasherized || !isAngleBracket) {
-      var result = _emberHtmlbarsUtilsLookupComponent.default(env.owner, tagName);
+      var options = {};
+      if (_emberMetalFeatures.default('ember-htmlbars-local-lookup')) {
+        var moduleName = env.meta && env.meta.moduleName;
+
+        if (moduleName) {
+          options.source = 'template:' + moduleName;
+        }
+      }
+
+      var result = _emberHtmlbarsUtilsLookupComponent.default(env.owner, tagName, options);
+
       component = result.component;
       layout = result.layout;
 
@@ -8100,6 +8218,16 @@ enifed('ember-htmlbars/hooks/has-helper', ['exports', 'ember-htmlbars/system/loo
     if (_emberHtmlbarsSystemLookupHelper.validateLazyHelperName(helperName, owner, env.hooks.keywords)) {
       var registrationName = 'helper:' + helperName;
       if (owner.hasRegistration(registrationName)) {
+        return true;
+      }
+
+      var options = {};
+      var moduleName = env.meta && env.meta.moduleName;
+      if (moduleName) {
+        options.source = 'template:' + moduleName;
+      }
+
+      if (owner.hasRegistration(registrationName, options)) {
         return true;
       }
     }
@@ -9614,7 +9742,7 @@ enifed('ember-htmlbars/keywords/outlet', ['exports', 'ember-metal/debug', 'ember
 
   'use strict';
 
-  _emberHtmlbarsTemplatesTopLevelView.default.meta.revision = 'Ember@2.4.0-canary+3d1cf7b6';
+  _emberHtmlbarsTemplatesTopLevelView.default.meta.revision = 'Ember@2.4.0-canary+9a63d4aa';
 
   /**
     The `{{outlet}}` helper lets you specify where a child routes will render in
@@ -9696,7 +9824,11 @@ enifed('ember-htmlbars/keywords/outlet', ['exports', 'ember-metal/debug', 'ember
     },
 
     childEnv: function (state, env) {
-      return env.childWithOutletState(state.outletState && state.outletState.outlets, true);
+      var outletState = state.outletState;
+      var toRender = outletState && outletState.render;
+      var meta = toRender && toRender.template && toRender.template.meta;
+
+      return env.childWithOutletState(outletState && outletState.outlets, true, meta);
     },
 
     isStable: function (lastState, nextState) {
@@ -10708,7 +10840,8 @@ enifed('ember-htmlbars/node-managers/component-node-manager', ['exports', 'ember
     var component = this.component;
 
     return _emberHtmlbarsSystemInstrumentationSupport.instrument(component, function ComponentNodeManager_render_instrument() {
-      var env = _env.childWithView(component);
+      var meta = this.block && this.block.template.meta;
+      var env = _env.childWithView(component, meta);
 
       env.renderer.componentWillRender(component);
       env.renderedViews.push(component.elementId);
@@ -10954,6 +11087,10 @@ enifed('ember-htmlbars/node-managers/view-node-manager', ['exports', 'ember-meta
       var newEnv = env;
       if (component) {
         newEnv = env.childWithView(component);
+      } else {
+        var meta = this.block && this.block.template.meta;
+
+        newEnv = env.childWithMeta(meta);
       }
 
       if (component) {
@@ -11004,7 +11141,12 @@ enifed('ember-htmlbars/node-managers/view-node-manager', ['exports', 'ember-meta
         env.renderer.willRender(component);
 
         env.renderedViews.push(component.elementId);
+      } else {
+        var meta = this.block && this.block.template.meta;
+
+        newEnv = env.childWithMeta(meta);
       }
+
       if (this.block) {
         this.block.invoke(newEnv, [], undefined, this.renderNode, this.scope, visitor);
       }
@@ -11471,21 +11613,34 @@ enifed('ember-htmlbars/system/lookup-helper', ['exports', 'ember-metal/debug', '
     @param {String} name the name of the helper to lookup
     @return {Helper}
   */
-
-  function findHelper(name, view, env) {
+  function _findHelper(name, view, env, options) {
     var helper = env.helpers[name];
 
     if (!helper) {
       var owner = env.owner;
       if (validateLazyHelperName(name, owner, env.hooks.keywords)) {
         var helperName = 'helper:' + name;
-        if (owner.hasRegistration(helperName)) {
-          helper = owner._lookupFactory(helperName);
+        if (owner.hasRegistration(helperName, options)) {
+          helper = owner._lookupFactory(helperName, options);
         }
       }
     }
 
     return helper;
+  }
+
+  function findHelper(name, view, env) {
+    var globalHelper = _findHelper(name, view, env);
+
+    var options = {};
+    var moduleName = env.meta && env.meta.moduleName;
+    if (moduleName) {
+      options.source = 'template:' + moduleName;
+    }
+
+    var localHelper = _findHelper(name, view, env, options);
+
+    return globalHelper || localHelper;
   }
 
   function lookupHelper(name, view, env) {
@@ -11567,6 +11722,7 @@ enifed('ember-htmlbars/system/render-env', ['exports', 'ember-htmlbars/env', 'em
     this.owner = options.owner;
     this.renderer = options.renderer;
     this.dom = options.dom;
+    this.meta = options.meta;
 
     this.hooks = _emberHtmlbarsEnv.default.hooks;
     this.helpers = _emberHtmlbarsEnv.default.helpers;
@@ -11574,17 +11730,35 @@ enifed('ember-htmlbars/system/render-env', ['exports', 'ember-htmlbars/env', 'em
     this.destinedForDOM = this.renderer._destinedForDOM;
   }
 
-  RenderEnv.build = function (view) {
+  RenderEnv.build = function (view, meta) {
     return new RenderEnv({
       view: view,
       outletState: view.outletState,
       owner: _containerOwner.getOwner(view),
       renderer: view.renderer,
-      dom: view.renderer._dom
+      dom: view.renderer._dom,
+      meta: meta
+    });
+  };
+
+  RenderEnv.prototype.childWithMeta = function (meta) {
+    return new RenderEnv({
+      view: this.view,
+      outletState: this.outletState,
+      owner: this.owner,
+      renderer: this.renderer,
+      dom: this.dom,
+      lifecycleHooks: this.lifecycleHooks,
+      renderedViews: this.renderedViews,
+      renderedNodes: this.renderedNodes,
+      hasParentOutlet: this.hasParentOutlet,
+      meta: meta
     });
   };
 
   RenderEnv.prototype.childWithView = function (view) {
+    var meta = arguments.length <= 1 || arguments[1] === undefined ? this.meta : arguments[1];
+
     return new RenderEnv({
       view: view,
       outletState: this.outletState,
@@ -11594,12 +11768,14 @@ enifed('ember-htmlbars/system/render-env', ['exports', 'ember-htmlbars/env', 'em
       lifecycleHooks: this.lifecycleHooks,
       renderedViews: this.renderedViews,
       renderedNodes: this.renderedNodes,
-      hasParentOutlet: this.hasParentOutlet
+      hasParentOutlet: this.hasParentOutlet,
+      meta: meta
     });
   };
 
   RenderEnv.prototype.childWithOutletState = function (outletState) {
     var hasParentOutlet = arguments.length <= 1 || arguments[1] === undefined ? this.hasParentOutlet : arguments[1];
+    var meta = arguments.length <= 2 || arguments[2] === undefined ? this.meta : arguments[2];
 
     return new RenderEnv({
       view: this.view,
@@ -11610,7 +11786,8 @@ enifed('ember-htmlbars/system/render-env', ['exports', 'ember-htmlbars/env', 'em
       lifecycleHooks: this.lifecycleHooks,
       renderedViews: this.renderedViews,
       renderedNodes: this.renderedNodes,
-      hasParentOutlet: hasParentOutlet
+      hasParentOutlet: hasParentOutlet,
+      meta: meta
     });
   };
 });
@@ -11623,7 +11800,8 @@ enifed('ember-htmlbars/system/render-view', ['exports', 'ember-htmlbars/node-man
   // HTMLBars propagates the existing env and renders templates for a given render node.
 
   function renderHTMLBarsBlock(view, block, renderNode) {
-    var env = _emberHtmlbarsSystemRenderEnv.default.build(view);
+    var meta = block && block.template && block.template.meta;
+    var env = _emberHtmlbarsSystemRenderEnv.default.build(view, meta);
 
     view.env = env;
     _emberHtmlbarsNodeManagersViewNodeManager.createOrUpdateComponent(view, {}, null, renderNode, env);
@@ -12576,7 +12754,7 @@ enifed('ember-htmlbars/utils/extract-positional-params', ['exports', 'ember-meta
     }
   }
 });
-enifed('ember-htmlbars/utils/is-component', ['exports', 'ember-htmlbars/system/lookup-helper', 'ember-htmlbars/keywords/closure-component', 'ember-metal/streams/utils'], function (exports, _emberHtmlbarsSystemLookupHelper, _emberHtmlbarsKeywordsClosureComponent, _emberMetalStreamsUtils) {
+enifed('ember-htmlbars/utils/is-component', ['exports', 'ember-metal/features', 'ember-htmlbars/system/lookup-helper', 'ember-htmlbars/keywords/closure-component', 'ember-metal/streams/utils'], function (exports, _emberMetalFeatures, _emberHtmlbarsSystemLookupHelper, _emberHtmlbarsKeywordsClosureComponent, _emberMetalStreamsUtils) {
   /**
   @module ember
   @submodule ember-htmlbars
@@ -12585,6 +12763,10 @@ enifed('ember-htmlbars/utils/is-component', ['exports', 'ember-htmlbars/system/l
   'use strict';
 
   exports.default = isComponent;
+
+  function hasComponentOrTemplate(owner, path, options) {
+    return owner.hasRegistration('component:' + path, options) || owner.hasRegistration('template:components/' + path, options);
+  }
 
   /*
    Given a path name, returns whether or not a component with that
@@ -12609,22 +12791,62 @@ enifed('ember-htmlbars/utils/is-component', ['exports', 'ember-htmlbars/system/l
       if (!_emberHtmlbarsSystemLookupHelper.CONTAINS_DASH_CACHE.get(path)) {
         return false;
       }
-      return owner.hasRegistration('component:' + path) || owner.hasRegistration('template:components/' + path);
+
+      if (hasComponentOrTemplate(owner, path)) {
+        return true; // global component found
+      } else {
+          if (_emberMetalFeatures.default('ember-htmlbars-local-lookup')) {
+            var moduleName = env.meta && env.meta.moduleName;
+
+            if (!moduleName) {
+              // without a source moduleName we can not perform local lookups
+              return false;
+            }
+
+            var options = { source: 'template:' + moduleName };
+
+            return hasComponentOrTemplate(owner, path, options);
+          } else {
+            return false;
+          }
+        }
     }
   }
 });
-enifed('ember-htmlbars/utils/lookup-component', ['exports'], function (exports) {
+enifed('ember-htmlbars/utils/lookup-component', ['exports', 'ember-metal/features', 'ember-metal/debug'], function (exports, _emberMetalFeatures, _emberMetalDebug) {
   'use strict';
 
   exports.default = lookupComponent;
 
-  function lookupComponent(container, tagName) {
-    var componentLookup = container.lookup('component-lookup:main');
-
+  function lookupComponentPair(componentLookup, owner, tagName, options) {
     return {
-      component: componentLookup.componentFor(tagName, container),
-      layout: componentLookup.layoutFor(tagName, container)
+      component: componentLookup.componentFor(tagName, owner, options),
+      layout: componentLookup.layoutFor(tagName, owner, options)
     };
+  }
+
+  function lookupComponent(owner, tagName, options) {
+    var componentLookup = owner.lookup('component-lookup:main');
+
+    var globalResult = lookupComponentPair(componentLookup, owner, tagName);
+    var source = options && options.source;
+    var localResult = undefined,
+        hasLocal = undefined,
+        hasGlobal = undefined;
+    hasGlobal = globalResult.component || globalResult.layout;
+
+    if (_emberMetalFeatures.default('ember-htmlbars-local-lookup')) {
+      if (source) {
+        localResult = lookupComponentPair(componentLookup, owner, tagName, options);
+        hasLocal = localResult.component || localResult.layout;
+      }
+    }
+
+    if (hasLocal && !hasGlobal) {
+      return localResult;
+    } else {
+      return globalResult;
+    }
   }
 });
 enifed('ember-htmlbars/utils/new-stream', ['exports', 'ember-metal/streams/proxy-stream', 'ember-htmlbars/utils/subscribe'], function (exports, _emberMetalStreamsProxyStream, _emberHtmlbarsUtilsSubscribe) {
@@ -15122,7 +15344,7 @@ enifed('ember-metal/core', ['exports', 'require'], function (exports, _require) 
   
     @class Ember
     @static
-    @version 2.4.0-canary+3d1cf7b6
+    @version 2.4.0-canary+9a63d4aa
     @public
   */
 
@@ -15164,11 +15386,11 @@ enifed('ember-metal/core', ['exports', 'require'], function (exports, _require) 
   
     @property VERSION
     @type String
-    @default '2.4.0-canary+3d1cf7b6'
+    @default '2.4.0-canary+9a63d4aa'
     @static
     @public
   */
-  Ember.VERSION = '2.4.0-canary+3d1cf7b6';
+  Ember.VERSION = '2.4.0-canary+9a63d4aa';
 
   /**
     The hash of environment variables used to control various configuration
@@ -15984,7 +16206,7 @@ enifed('ember-metal/features', ['exports', 'ember-metal/core', 'ember-metal/assi
     @since 1.1.0
     @public
   */
-  var FEATURES = _emberMetalAssign.default({"features-stripped-test":null,"ember-htmlbars-component-generation":null,"ember-routing-route-configured-query-params":null,"ember-libraries-isregistered":null,"ember-routing-routable-components":null,"ember-metal-ember-assign":null}, _emberMetalCore.default.ENV.FEATURES);exports.FEATURES = FEATURES;
+  var FEATURES = _emberMetalAssign.default({"features-stripped-test":null,"ember-htmlbars-component-generation":null,"ember-routing-route-configured-query-params":null,"ember-libraries-isregistered":null,"ember-routing-routable-components":null,"ember-metal-ember-assign":null,"ember-htmlbars-local-lookup":null}, _emberMetalCore.default.ENV.FEATURES);exports.FEATURES = FEATURES;
   // jshint ignore:line
 
   /**
@@ -28763,7 +28985,7 @@ enifed('ember-routing-views/components/link-to', ['exports', 'ember-metal/logger
 
   'use strict';
 
-  _emberHtmlbarsTemplatesLinkTo.default.meta.revision = 'Ember@2.4.0-canary+3d1cf7b6';
+  _emberHtmlbarsTemplatesLinkTo.default.meta.revision = 'Ember@2.4.0-canary+9a63d4aa';
 
   /**
     `Ember.LinkComponent` renders an element whose `click` event triggers a
@@ -29263,7 +29485,7 @@ enifed('ember-routing-views/views/outlet', ['exports', 'ember-views/views/view',
 
   'use strict';
 
-  _emberHtmlbarsTemplatesTopLevelView.default.meta.revision = 'Ember@2.4.0-canary+3d1cf7b6';
+  _emberHtmlbarsTemplatesTopLevelView.default.meta.revision = 'Ember@2.4.0-canary+9a63d4aa';
 
   var CoreOutletView = _emberViewsViewsView.default.extend({
     defaultTemplate: _emberHtmlbarsTemplatesTopLevelView.default,
@@ -38113,7 +38335,7 @@ enifed('ember-template-compiler/system/compile_options', ['exports', 'ember-meta
     options.buildMeta = function buildMeta(program) {
       return {
         fragmentReason: fragmentReason(program),
-        revision: 'Ember@2.4.0-canary+3d1cf7b6',
+        revision: 'Ember@2.4.0-canary+9a63d4aa',
         loc: program.loc,
         moduleName: options.moduleName
       };
@@ -38377,22 +38599,22 @@ enifed('ember-views/component_lookup', ['exports', 'ember-metal/core', 'ember-me
       }
     },
 
-    componentFor: function (name, owner) {
+    componentFor: function (name, owner, options) {
       if (this.invalidName(name)) {
         return;
       }
 
       var fullName = 'component:' + name;
-      return owner._lookupFactory(fullName);
+      return owner._lookupFactory(fullName, options);
     },
 
-    layoutFor: function (name, owner) {
+    layoutFor: function (name, owner, options) {
       if (this.invalidName(name)) {
         return;
       }
 
       var templateFullName = 'template:components/' + name;
-      return owner.lookup(templateFullName);
+      return owner.lookup(templateFullName, options);
     }
   });
 });
@@ -42169,7 +42391,7 @@ enifed('ember-views/views/collection_view', ['exports', 'ember-metal/core', 'emb
 enifed('ember-views/views/container_view', ['exports', 'ember-metal/core', 'ember-metal/debug', 'ember-runtime/mixins/mutable_array', 'ember-runtime/system/native_array', 'ember-views/views/view', 'ember-metal/property_get', 'ember-metal/property_set', 'ember-metal/mixin', 'ember-metal/events', 'ember-htmlbars/templates/container-view'], function (exports, _emberMetalCore, _emberMetalDebug, _emberRuntimeMixinsMutable_array, _emberRuntimeSystemNative_array, _emberViewsViewsView, _emberMetalProperty_get, _emberMetalProperty_set, _emberMetalMixin, _emberMetalEvents, _emberHtmlbarsTemplatesContainerView) {
   'use strict';
 
-  _emberHtmlbarsTemplatesContainerView.default.meta.revision = 'Ember@2.4.0-canary+3d1cf7b6';
+  _emberHtmlbarsTemplatesContainerView.default.meta.revision = 'Ember@2.4.0-canary+9a63d4aa';
 
   /**
   @module ember
