@@ -29137,18 +29137,18 @@ enifed('ember-htmlbars/tests/integration/local-lookup-test', ['exports', 'ember-
     owner.register('helper:' + name, helper);
   }
 
+  QUnit.module('component - local lookup', {
+    setup: function () {
+      commonSetup();
+    },
+
+    teardown: function () {
+      commonTeardown();
+    }
+  });
+
   if (_emberMetalFeatures.default('ember-htmlbars-local-lookup')) {
     // jscs:disable validateIndentation
-
-    QUnit.module('component - local lookup', {
-      setup: function () {
-        commonSetup();
-      },
-
-      teardown: function () {
-        commonTeardown();
-      }
-    });
 
     QUnit.test('local component lookup with matching template', function () {
       expect(1);
@@ -29187,6 +29187,22 @@ enifed('ember-htmlbars/tests/integration/local-lookup-test', ['exports', 'ember-
       equal(view.$().text(), 'Who dat? Who dis?');
     });
 
+    QUnit.test('local helper lookup overrides global lookup', function () {
+      expect(1);
+
+      registerTemplate('components/x-outer', 'Who dat? {{x-helper}}');
+      registerHelper('x-outer/x-helper', _emberHtmlbarsHelper.helper(function () {
+        return 'Who dis?';
+      }));
+      registerHelper('x-helper', _emberHtmlbarsHelper.helper(function () {
+        return 'I dunno';
+      }));
+
+      view = appendViewFor('{{x-outer}} {{x-helper}}', 'route-template');
+
+      equal(view.$().text(), 'Who dat? Who dis? I dunno');
+    });
+
     QUnit.test('lookup without match issues standard assertion (with local helper name)', function () {
       expect(1);
 
@@ -29197,18 +29213,28 @@ enifed('ember-htmlbars/tests/integration/local-lookup-test', ['exports', 'ember-
       }, /A helper named 'x-inner' could not be found/);
     });
 
-    QUnit.test('lookup with both global and local match uses global with a deprecation', function () {
-      expect(2);
+    QUnit.test('local lookup overrides global lookup', function () {
+      expect(1);
 
       registerTemplate('components/x-outer', '{{#x-inner}}Hi!{{/x-inner}}');
       registerTemplate('components/x-outer/x-inner', 'Nested template says (from local): {{yield}}');
       registerTemplate('components/x-inner', 'Nested template says (from global): {{yield}}');
 
-      expectDeprecation(function () {
-        view = appendViewFor('{{x-outer}}', 'route-template');
-      }, /While processing `x-inner` in `template:components\/x-outer` both a global and local component were found. The global component will be used. Please resolve this ambiguity./);
+      view = appendViewFor('{{#x-inner}}Hi!{{/x-inner}} {{x-outer}} {{#x-outer/x-inner}}Hi!{{/x-outer/x-inner}}', 'route-template');
 
-      equal(view.$().text(), 'Nested template says (from global): Hi!');
+      equal(view.$().text(), 'Nested template says (from global): Hi! Nested template says (from local): Hi! Nested template says (from local): Hi!');
+    });
+  } else {
+    QUnit.test('lookup with both global and local match uses specifically invoked component', function () {
+      expect(1);
+
+      registerTemplate('components/x-outer', '{{#x-inner}}Hi!{{/x-inner}}');
+      registerTemplate('components/x-outer/x-inner', 'Nested template says (from local): {{yield}}');
+      registerTemplate('components/x-inner', 'Nested template says (from global): {{yield}}');
+
+      view = appendViewFor('{{#x-inner}}Hi!{{/x-inner}} {{x-outer}} {{#x-outer/x-inner}}Hi!{{/x-outer/x-inner}}', 'route-template');
+
+      equal(view.$().text(), 'Nested template says (from global): Hi! Nested template says (from global): Hi! Nested template says (from local): Hi!');
     });
   }
 });

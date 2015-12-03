@@ -1731,7 +1731,7 @@ enifed('container/owner', ['exports', 'ember-metal/symbol'], function (exports, 
     object[OWNER] = owner;
   }
 });
-enifed('container/registry', ['exports', 'ember-metal/features', 'ember-metal/debug', 'ember-metal/dictionary', 'ember-metal/assign', 'container/container'], function (exports, _emberMetalFeatures, _emberMetalDebug, _emberMetalDictionary, _emberMetalAssign, _containerContainer) {
+enifed('container/registry', ['exports', 'ember-metal/features', 'ember-metal/debug', 'ember-metal/dictionary', 'ember-metal/empty_object', 'ember-metal/assign', 'container/container'], function (exports, _emberMetalFeatures, _emberMetalDebug, _emberMetalDictionary, _emberMetalEmpty_object, _emberMetalAssign, _containerContainer) {
   'use strict';
 
   var VALID_FULL_NAME_REGEXP = /^[^:]+.+:[^:]+$/;
@@ -1767,7 +1767,7 @@ enifed('container/registry', ['exports', 'ember-metal/features', 'ember-metal/de
     this._factoryTypeInjections = _emberMetalDictionary.default(null);
     this._factoryInjections = _emberMetalDictionary.default(null);
 
-    this._localLookupCache = _emberMetalDictionary.default(null);
+    this._localLookupCache = new _emberMetalEmpty_object.default();
     this._normalizeCache = _emberMetalDictionary.default(null);
     this._resolveCache = _emberMetalDictionary.default(null);
     this._failCache = _emberMetalDictionary.default(null);
@@ -1918,7 +1918,8 @@ enifed('container/registry', ['exports', 'ember-metal/features', 'ember-metal/de
 
       var normalizedName = this.normalize(fullName);
 
-      delete this._localLookupCache[normalizedName];
+      this._localLookupCache = new _emberMetalEmpty_object.default();
+
       delete this.registrations[normalizedName];
       delete this._resolveCache[normalizedName];
       delete this._failCache[normalizedName];
@@ -2452,7 +2453,7 @@ enifed('container/registry', ['exports', 'ember-metal/features', 'ember-metal/de
     var normalizedNameCache = cache[normalizedName];
 
     if (!normalizedNameCache) {
-      normalizedNameCache = cache[normalizedName] = _emberMetalDictionary.default(null);
+      normalizedNameCache = cache[normalizedName] = new _emberMetalEmpty_object.default();
     }
 
     var cached = normalizedNameCache[normalizedSource];
