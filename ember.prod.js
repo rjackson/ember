@@ -6,7 +6,7 @@
  *            Portions Copyright 2008-2011 Apple Inc. All rights reserved.
  * @license   Licensed under MIT license
  *            See https://raw.github.com/emberjs/ember.js/master/LICENSE
- * @version   2.9.0-null+3ce93361
+ * @version   2.9.0-fix-toplevel-tree-destruction+2a64c3f0
  */
 
 var enifed, requireModule, require, Ember;
@@ -7820,7 +7820,7 @@ enifed('ember-glimmer/components/link-to', ['exports', 'ember-console', 'ember-m
        @property activeClass
       @type String
       @default active
-      @public
+      @private
     **/
     activeClass: 'active',
 
@@ -13860,7 +13860,7 @@ enifed('ember-htmlbars/components/link-to', ['exports', 'ember-console', 'ember-
        @property activeClass
       @type String
       @default active
-      @public
+      @private
     **/
     activeClass: 'active',
 
@@ -19472,7 +19472,7 @@ enifed('ember-htmlbars/renderer', ['exports', 'ember-metal/run_loop', 'ember-met
 
   Renderer.prototype.revalidateTopLevelView = function Renderer_revalidateTopLevelView(view) {
     // This guard prevents revalidation on an already-destroyed view.
-    if (view._renderNode.lastResult) {
+    if (view._renderNode && view._renderNode.lastResult) {
       view._renderNode.lastResult.revalidate(view._env);
       this.dispatchLifecycleHooks(view._env);
       this.clearRenderedViews(view._env);
@@ -19648,7 +19648,6 @@ enifed('ember-htmlbars/renderer', ['exports', 'ember-metal/run_loop', 'ember-met
     var renderNode = view._renderNode;
     view._renderNode = null;
     if (renderNode) {
-      renderNode.emberView = null;
       this.willDestroyElement(view);
       view._transitionTo('destroying');
 
@@ -19657,6 +19656,9 @@ enifed('ember-htmlbars/renderer', ['exports', 'ember-metal/run_loop', 'ember-met
       if (_lastResult) {
         _htmlbarsRuntime.internal.clearMorph(renderNode, _lastResult.env, shouldDestroy !== false);
       }
+
+      renderNode.emberView = null;
+
       if (!shouldDestroy) {
         view._transitionTo('preRender');
       }
@@ -33822,8 +33824,7 @@ enifed('ember-routing/system/route', ['exports', 'ember-metal/debug', 'ember-met
        The string values provided for the template name, and controller
       will eventually pass through to the resolver for lookup. See
       Ember.Resolver for how these are mapped to JavaScript objects in your
-      application. The template to render into needs to be related to  either the
-      current route or one of its ancestors.
+      application.
        Not all options need to be passed to `render`. Default values will be used
       based on the name of the route specified in the router or the Route's
       `controllerName` and `templateName` properties.
@@ -47796,7 +47797,7 @@ enifed('ember/index', ['exports', 'require', 'ember-metal', 'ember-runtime', 'em
 enifed("ember/version", ["exports"], function (exports) {
   "use strict";
 
-  exports.default = "2.9.0-null+3ce93361";
+  exports.default = "2.9.0-fix-toplevel-tree-destruction+2a64c3f0";
 });
 enifed('htmlbars-runtime', ['exports', 'htmlbars-runtime/hooks', 'htmlbars-runtime/render', 'htmlbars-util/morph-utils', 'htmlbars-util/template-utils'], function (exports, _htmlbarsRuntimeHooks, _htmlbarsRuntimeRender, _htmlbarsUtilMorphUtils, _htmlbarsUtilTemplateUtils) {
   'use strict';

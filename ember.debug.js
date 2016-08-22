@@ -6,7 +6,7 @@
  *            Portions Copyright 2008-2011 Apple Inc. All rights reserved.
  * @license   Licensed under MIT license
  *            See https://raw.github.com/emberjs/ember.js/master/LICENSE
- * @version   2.9.0-null+3ce93361
+ * @version   2.9.0-fix-toplevel-tree-destruction+2a64c3f0
  */
 
 var enifed, requireModule, require, Ember;
@@ -8463,7 +8463,7 @@ enifed('ember-glimmer/components/link-to', ['exports', 'ember-console', 'ember-m
        @property activeClass
       @type String
       @default active
-      @public
+      @private
     **/
     activeClass: 'active',
 
@@ -11560,7 +11560,7 @@ babelHelpers.classCallCheck(this, CurlyComponentManager);
         var elementId = component.elementId;
         var tagName = component.tagName;
 
-        return tagName !== '' || props.id === elementId || !elementId && elementId !== '';
+        return tagName !== '' || !elementId && elementId !== '';
       })());
 
       _emberMetalDebug.assert('You cannot use `attributeBindings` on a tag-less component: ' + component.toString(), (function () {
@@ -14796,7 +14796,7 @@ enifed('ember-htmlbars/components/link-to', ['exports', 'ember-console', 'ember-
        @property activeClass
       @type String
       @default active
-      @public
+      @private
     **/
     activeClass: 'active',
 
@@ -20491,7 +20491,7 @@ enifed('ember-htmlbars/renderer', ['exports', 'ember-metal/run_loop', 'ember-met
 
   Renderer.prototype.revalidateTopLevelView = function Renderer_revalidateTopLevelView(view) {
     // This guard prevents revalidation on an already-destroyed view.
-    if (view._renderNode.lastResult) {
+    if (view._renderNode && view._renderNode.lastResult) {
       view._renderNode.lastResult.revalidate(view._env);
       this.dispatchLifecycleHooks(view._env);
       this.clearRenderedViews(view._env);
@@ -20667,7 +20667,6 @@ enifed('ember-htmlbars/renderer', ['exports', 'ember-metal/run_loop', 'ember-met
     var renderNode = view._renderNode;
     view._renderNode = null;
     if (renderNode) {
-      renderNode.emberView = null;
       this.willDestroyElement(view);
       view._transitionTo('destroying');
 
@@ -20676,6 +20675,9 @@ enifed('ember-htmlbars/renderer', ['exports', 'ember-metal/run_loop', 'ember-met
       if (_lastResult) {
         _htmlbarsRuntime.internal.clearMorph(renderNode, _lastResult.env, shouldDestroy !== false);
       }
+
+      renderNode.emberView = null;
+
       if (!shouldDestroy) {
         view._transitionTo('preRender');
       }
@@ -22137,7 +22139,7 @@ enifed('ember-htmlbars/system/build-component-template', ['exports', 'ember-meta
         var _component2 = component;
         var elementId = _component2.elementId;
 
-        return tagName !== '' || attrs.id === elementId || !elementId && elementId !== '';
+        return tagName !== '' || !elementId && elementId !== '';
       })());
 
       _emberMetalDebug.assert('You cannot use `attributeBindings` on a tag-less component: ' + component.toString(), (function () {
@@ -35022,8 +35024,7 @@ enifed('ember-routing/system/route', ['exports', 'ember-metal/debug', 'ember-met
        The string values provided for the template name, and controller
       will eventually pass through to the resolver for lookup. See
       Ember.Resolver for how these are mapped to JavaScript objects in your
-      application. The template to render into needs to be related to  either the
-      current route or one of its ancestors.
+      application.
        Not all options need to be passed to `render`. Default values will be used
       based on the name of the route specified in the router or the Route's
       `controllerName` and `templateName` properties.
@@ -46617,42 +46618,30 @@ enifed('ember-testing/ext/rsvp', ['exports', 'ember-runtime/ext/rsvp', 'ember-me
 enifed('ember-testing/helpers', ['exports', 'ember-testing/test/helpers', 'ember-testing/helpers/and_then', 'ember-testing/helpers/click', 'ember-testing/helpers/current_path', 'ember-testing/helpers/current_route_name', 'ember-testing/helpers/current_url', 'ember-testing/helpers/fill_in', 'ember-testing/helpers/find', 'ember-testing/helpers/find_with_assert', 'ember-testing/helpers/key_event', 'ember-testing/helpers/pause_test', 'ember-testing/helpers/trigger_event', 'ember-testing/helpers/visit', 'ember-testing/helpers/wait'], function (exports, _emberTestingTestHelpers, _emberTestingHelpersAnd_then, _emberTestingHelpersClick, _emberTestingHelpersCurrent_path, _emberTestingHelpersCurrent_route_name, _emberTestingHelpersCurrent_url, _emberTestingHelpersFill_in, _emberTestingHelpersFind, _emberTestingHelpersFind_with_assert, _emberTestingHelpersKey_event, _emberTestingHelpersPause_test, _emberTestingHelpersTrigger_event, _emberTestingHelpersVisit, _emberTestingHelpersWait) {
   'use strict';
 
+  /**
+  @module ember
+  @submodule ember-testing
+  */
+
+  /**
+    Loads a route, sets up any controllers, and renders any templates associated
+    with the route as though a real user had triggered the route change while
+    using your app.
+  
+    Example:
+  
+    ```javascript
+    visit('posts/index').then(function() {
+      // assert something
+    });
+    ```
+  
+    @method visit
+    @param {String} url the name of the route
+    @return {RSVP.Promise}
+    @public
+  */
   _emberTestingTestHelpers.registerAsyncHelper('visit', _emberTestingHelpersVisit.default);
-  _emberTestingTestHelpers.registerAsyncHelper('click', _emberTestingHelpersClick.default);
-  _emberTestingTestHelpers.registerAsyncHelper('keyEvent', _emberTestingHelpersKey_event.default);
-  _emberTestingTestHelpers.registerAsyncHelper('fillIn', _emberTestingHelpersFill_in.default);
-  _emberTestingTestHelpers.registerAsyncHelper('wait', _emberTestingHelpersWait.default);
-  _emberTestingTestHelpers.registerAsyncHelper('andThen', _emberTestingHelpersAnd_then.default);
-  _emberTestingTestHelpers.registerAsyncHelper('pauseTest', _emberTestingHelpersPause_test.default);
-  _emberTestingTestHelpers.registerAsyncHelper('triggerEvent', _emberTestingHelpersTrigger_event.default);
-
-  _emberTestingTestHelpers.registerHelper('find', _emberTestingHelpersFind.default);
-  _emberTestingTestHelpers.registerHelper('findWithAssert', _emberTestingHelpersFind_with_assert.default);
-  _emberTestingTestHelpers.registerHelper('currentRouteName', _emberTestingHelpersCurrent_route_name.default);
-  _emberTestingTestHelpers.registerHelper('currentPath', _emberTestingHelpersCurrent_path.default);
-  _emberTestingTestHelpers.registerHelper('currentURL', _emberTestingHelpersCurrent_url.default);
-});
-enifed("ember-testing/helpers/and_then", ["exports"], function (exports) {
-  /**
-  @module ember
-  @submodule ember-testing
-  */
-  "use strict";
-
-  exports.default = andThen;
-
-  function andThen(app, callback) {
-    return app.testHelpers.wait(callback(app));
-  }
-});
-enifed('ember-testing/helpers/click', ['exports', 'ember-testing/events'], function (exports, _emberTestingEvents) {
-  /**
-  @module ember
-  @submodule ember-testing
-  */
-  'use strict';
-
-  exports.default = click;
 
   /**
     Clicks an element and triggers any actions triggered by the element's `click`
@@ -46672,30 +46661,111 @@ enifed('ember-testing/helpers/click', ['exports', 'ember-testing/events'], funct
     @return {RSVP.Promise}
     @public
   */
+  _emberTestingTestHelpers.registerAsyncHelper('click', _emberTestingHelpersClick.default);
 
-  function click(app, selector, context) {
-    var $el = app.testHelpers.findWithAssert(selector, context);
-    var el = $el[0];
-
-    _emberTestingEvents.fireEvent(el, 'mousedown');
-
-    _emberTestingEvents.focus(el);
-
-    _emberTestingEvents.fireEvent(el, 'mouseup');
-    _emberTestingEvents.fireEvent(el, 'click');
-
-    return app.testHelpers.wait();
-  }
-});
-enifed('ember-testing/helpers/current_path', ['exports', 'ember-metal/property_get'], function (exports, _emberMetalProperty_get) {
   /**
-  @module ember
-  @submodule ember-testing
+    Simulates a key event, e.g. `keypress`, `keydown`, `keyup` with the desired keyCode
+  
+    Example:
+  
+    ```javascript
+    keyEvent('.some-jQuery-selector', 'keypress', 13).then(function() {
+     // assert something
+    });
+    ```
+  
+    @method keyEvent
+    @param {String} selector jQuery selector for finding element on the DOM
+    @param {String} type the type of key event, e.g. `keypress`, `keydown`, `keyup`
+    @param {Number} keyCode the keyCode of the simulated key event
+    @return {RSVP.Promise}
+    @since 1.5.0
+    @public
   */
-  'use strict';
+  _emberTestingTestHelpers.registerAsyncHelper('keyEvent', _emberTestingHelpersKey_event.default);
 
-  exports.default = currentPath;
+  /**
+    Fills in an input element with some text.
+  
+    Example:
+  
+    ```javascript
+    fillIn('#email', 'you@example.com').then(function() {
+      // assert something
+    });
+    ```
+  
+    @method fillIn
+    @param {String} selector jQuery selector finding an input element on the DOM
+    to fill text with
+    @param {String} text text to place inside the input element
+    @return {RSVP.Promise}
+    @public
+  */
+  _emberTestingTestHelpers.registerAsyncHelper('fillIn', _emberTestingHelpersFill_in.default);
 
+  /**
+    Finds an element in the context of the app's container element. A simple alias
+    for `app.$(selector)`.
+  
+    Example:
+  
+    ```javascript
+    var $el = find('.my-selector');
+    ```
+  
+    @method find
+    @param {String} selector jQuery string selector for element lookup
+    @return {Object} jQuery object representing the results of the query
+    @public
+  */
+  _emberTestingTestHelpers.registerHelper('find', _emberTestingHelpersFind.default);
+
+  /**
+    Like `find`, but throws an error if the element selector returns no results.
+  
+    Example:
+  
+    ```javascript
+    var $el = findWithAssert('.doesnt-exist'); // throws error
+    ```
+  
+    @method findWithAssert
+    @param {String} selector jQuery selector string for finding an element within
+    the DOM
+    @return {Object} jQuery object representing the results of the query
+    @throws {Error} throws error if jQuery object returned has a length of 0
+    @public
+  */
+  _emberTestingTestHelpers.registerHelper('findWithAssert', _emberTestingHelpersFind_with_assert.default);
+
+  /**
+    Causes the run loop to process any pending events. This is used to ensure that
+    any async operations from other helpers (or your assertions) have been processed.
+  
+    This is most often used as the return value for the helper functions (see 'click',
+    'fillIn','visit',etc).
+  
+    Example:
+  
+    ```javascript
+    Ember.Test.registerAsyncHelper('loginUser', function(app, username, password) {
+      visit('secured/path/here')
+      .fillIn('#username', username)
+      .fillIn('#password', password)
+      .click('.submit')
+  
+      return app.testHelpers.wait();
+    });
+  
+    @method wait
+    @param {Object} value The value to be returned.
+    @return {RSVP.Promise}
+    @public
+  */
+  _emberTestingTestHelpers.registerAsyncHelper('wait', _emberTestingHelpersWait.default);
+  _emberTestingTestHelpers.registerAsyncHelper('andThen', _emberTestingHelpersAnd_then.default);
+  _emberTestingTestHelpers.registerHelper('currentRouteName', _emberTestingHelpersCurrent_route_name.default);
   /**
     Returns the current path.
   
@@ -46714,6 +46784,62 @@ enifed('ember-testing/helpers/current_path', ['exports', 'ember-metal/property_g
   @since 1.5.0
   @public
   */
+  _emberTestingTestHelpers.registerHelper('currentPath', _emberTestingHelpersCurrent_path.default);
+
+  /**
+    Returns the current URL.
+  
+  Example:
+  
+  ```javascript
+  function validateURL() {
+    equal(currentURL(), '/some/path', "correct URL was transitioned into.");
+  }
+  
+  click('#some-link-id').then(validateURL);
+  ```
+  
+  @method currentURL
+  @return {Object} The currently active URL.
+  @since 1.5.0
+  @public
+  */
+  _emberTestingTestHelpers.registerHelper('currentURL', _emberTestingHelpersCurrent_url.default);
+  _emberTestingTestHelpers.registerAsyncHelper('pauseTest', _emberTestingHelpersPause_test.default);
+  _emberTestingTestHelpers.registerAsyncHelper('triggerEvent', _emberTestingHelpersTrigger_event.default);
+});
+enifed("ember-testing/helpers/and_then", ["exports"], function (exports) {
+  "use strict";
+
+  exports.default = andThen;
+
+  function andThen(app, callback) {
+    return app.testHelpers.wait(callback(app));
+  }
+});
+enifed('ember-testing/helpers/click', ['exports', 'ember-testing/events'], function (exports, _emberTestingEvents) {
+  'use strict';
+
+  exports.default = click;
+
+  function click(app, selector, context) {
+    var $el = app.testHelpers.findWithAssert(selector, context);
+    var el = $el[0];
+
+    _emberTestingEvents.fireEvent(el, 'mousedown');
+
+    _emberTestingEvents.focus(el);
+
+    _emberTestingEvents.fireEvent(el, 'mouseup');
+    _emberTestingEvents.fireEvent(el, 'click');
+
+    return app.testHelpers.wait();
+  }
+});
+enifed('ember-testing/helpers/current_path', ['exports', 'ember-metal/property_get'], function (exports, _emberMetalProperty_get) {
+  'use strict';
+
+  exports.default = currentPath;
 
   function currentPath(app) {
     var routingService = app.__container__.lookup('service:-routing');
@@ -46750,32 +46876,9 @@ enifed('ember-testing/helpers/current_route_name', ['exports', 'ember-metal/prop
   }
 });
 enifed('ember-testing/helpers/current_url', ['exports', 'ember-metal/property_get'], function (exports, _emberMetalProperty_get) {
-  /**
-  @module ember
-  @submodule ember-testing
-  */
   'use strict';
 
   exports.default = currentURL;
-
-  /**
-    Returns the current URL.
-  
-  Example:
-  
-  ```javascript
-  function validateURL() {
-    equal(currentURL(), '/some/path', "correct URL was transitioned into.");
-  }
-  
-  click('#some-link-id').then(validateURL);
-  ```
-  
-  @method currentURL
-  @return {Object} The currently active URL.
-  @since 1.5.0
-  @public
-  */
 
   function currentURL(app) {
     var router = app.__container__.lookup('router:main');
@@ -46783,32 +46886,9 @@ enifed('ember-testing/helpers/current_url', ['exports', 'ember-metal/property_ge
   }
 });
 enifed('ember-testing/helpers/fill_in', ['exports', 'ember-testing/events'], function (exports, _emberTestingEvents) {
-  /**
-  @module ember
-  @submodule ember-testing
-  */
   'use strict';
 
   exports.default = fillIn;
-
-  /**
-    Fills in an input element with some text.
-  
-    Example:
-  
-    ```javascript
-    fillIn('#email', 'you@example.com').then(function() {
-      // assert something
-    });
-    ```
-  
-    @method fillIn
-    @param {String} selector jQuery selector finding an input element on the DOM
-    to fill text with
-    @param {String} text text to place inside the input element
-    @return {RSVP.Promise}
-    @public
-  */
 
   function fillIn(app, selector, contextOrText, text) {
     var $el = undefined,
@@ -46831,37 +46911,9 @@ enifed('ember-testing/helpers/fill_in', ['exports', 'ember-testing/events'], fun
   }
 });
 enifed('ember-testing/helpers/find', ['exports', 'ember-metal/property_get'], function (exports, _emberMetalProperty_get) {
-  /**
-  @module ember
-  @submodule ember-testing
-  */
   'use strict';
 
   exports.default = find;
-
-  /**
-    Finds an element in the context of the app's container element. A simple alias
-    for `app.$(selector)`.
-  
-    Example:
-  
-    ```javascript
-    var $el = find('.my-selector');
-    ```
-  
-    With the `context` param:
-  
-    ```javascript
-    var $el = find('.my-selector', '.parent-element-class');
-    ```
-  
-    @method find
-    @param {String} selector jQuery string selector for element lookup
-    @param {String} [context] (optional) jQuery selector that will limit the selector
-                              argument to find only within the context's children
-    @return {Object} jQuery object representing the results of the query
-    @public
-  */
 
   function find(app, selector, context) {
     var $el = undefined;
@@ -46871,34 +46923,6 @@ enifed('ember-testing/helpers/find', ['exports', 'ember-metal/property_get'], fu
   }
 });
 enifed('ember-testing/helpers/find_with_assert', ['exports'], function (exports) {
-  /**
-  @module ember
-  @submodule ember-testing
-  */
-  /**
-    Like `find`, but throws an error if the element selector returns no results.
-  
-    Example:
-  
-    ```javascript
-    var $el = findWithAssert('.doesnt-exist'); // throws error
-    ```
-  
-    With the `context` param:
-  
-    ```javascript
-    var $el = findWithAssert('.selector-id', '.parent-element-class'); // assert will pass
-    ```
-  
-    @method findWithAssert
-    @param {String} selector jQuery selector string for finding an element within
-    the DOM
-    @param {String} [context] (optional) jQuery selector that will limit the
-    selector argument to find only within the context's children
-    @return {Object} jQuery object representing the results of the query
-    @throws {Error} throws error if jQuery object returned has a length of 0
-    @public
-  */
   'use strict';
 
   exports.default = findWithAssert;
@@ -46912,26 +46936,6 @@ enifed('ember-testing/helpers/find_with_assert', ['exports'], function (exports)
   }
 });
 enifed('ember-testing/helpers/key_event', ['exports'], function (exports) {
-  /**
-  @module ember
-  @submodule ember-testing
-  */
-  /**
-    Simulates a key event, e.g. `keypress`, `keydown`, `keyup` with the desired keyCode
-    Example:
-    ```javascript
-    keyEvent('.some-jQuery-selector', 'keypress', 13).then(function() {
-     // assert something
-    });
-    ```
-    @method keyEvent
-    @param {String} selector jQuery selector for finding element on the DOM
-    @param {String} type the type of key event, e.g. `keypress`, `keydown`, `keyup`
-    @param {Number} keyCode the keyCode of the simulated key event
-    @return {RSVP.Promise}
-    @since 1.5.0
-    @public
-  */
   'use strict';
 
   exports.default = keyEvent;
@@ -47052,32 +47056,9 @@ enifed('ember-testing/helpers/trigger_event', ['exports', 'ember-testing/events'
   }
 });
 enifed('ember-testing/helpers/visit', ['exports', 'ember-metal/run_loop'], function (exports, _emberMetalRun_loop) {
-  /**
-  @module ember
-  @submodule ember-testing
-  */
   'use strict';
 
   exports.default = visit;
-
-  /**
-    Loads a route, sets up any controllers, and renders any templates associated
-    with the route as though a real user had triggered the route change while
-    using your app.
-  
-    Example:
-  
-    ```javascript
-    visit('posts/index').then(function() {
-      // assert something
-    });
-    ```
-  
-    @method visit
-    @param {String} url the name of the route
-    @return {RSVP.Promise}
-    @public
-  */
 
   function visit(app, url) {
     var router = app.__container__.lookup('router:main');
@@ -47103,38 +47084,9 @@ enifed('ember-testing/helpers/visit', ['exports', 'ember-metal/run_loop'], funct
   }
 });
 enifed('ember-testing/helpers/wait', ['exports', 'ember-testing/test/waiters', 'ember-runtime/ext/rsvp', 'ember-metal/run_loop', 'ember-testing/test/pending_requests'], function (exports, _emberTestingTestWaiters, _emberRuntimeExtRsvp, _emberMetalRun_loop, _emberTestingTestPending_requests) {
-  /**
-  @module ember
-  @submodule ember-testing
-  */
   'use strict';
 
   exports.default = wait;
-
-  /**
-    Causes the run loop to process any pending events. This is used to ensure that
-    any async operations from other helpers (or your assertions) have been processed.
-  
-    This is most often used as the return value for the helper functions (see 'click',
-    'fillIn','visit',etc).
-  
-    Example:
-  
-    ```javascript
-    Ember.Test.registerAsyncHelper('loginUser', function(app, username, password) {
-      visit('secured/path/here')
-      .fillIn('#username', username)
-      .fillIn('#password', password)
-      .click('.submit')
-  
-      return app.testHelpers.wait();
-    });
-  
-    @method wait
-    @param {Object} value The value to be returned.
-    @return {RSVP.Promise}
-    @public
-  */
 
   function wait(app, value) {
     return new _emberRuntimeExtRsvp.default.Promise(function (resolve) {
@@ -50784,7 +50736,7 @@ enifed('ember/index', ['exports', 'require', 'ember-metal', 'ember-runtime', 'em
 enifed("ember/version", ["exports"], function (exports) {
   "use strict";
 
-  exports.default = "2.9.0-null+3ce93361";
+  exports.default = "2.9.0-fix-toplevel-tree-destruction+2a64c3f0";
 });
 enifed('htmlbars-runtime', ['exports', 'htmlbars-runtime/hooks', 'htmlbars-runtime/render', 'htmlbars-util/morph-utils', 'htmlbars-util/template-utils'], function (exports, _htmlbarsRuntimeHooks, _htmlbarsRuntimeRender, _htmlbarsUtilMorphUtils, _htmlbarsUtilTemplateUtils) {
   'use strict';
