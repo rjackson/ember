@@ -6,7 +6,7 @@
  *            Portions Copyright 2008-2011 Apple Inc. All rights reserved.
  * @license   Licensed under MIT license
  *            See https://raw.github.com/emberjs/ember.js/master/LICENSE
- * @version   2.9.0-fix-toplevel-tree-destruction+3dd760c7
+ * @version   2.9.0-fix-toplevel-tree-destruction+2fa40155
  */
 
 var enifed, requireModule, require, Ember;
