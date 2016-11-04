@@ -6,7 +6,7 @@
  *            Portions Copyright 2008-2011 Apple Inc. All rights reserved.
  * @license   Licensed under MIT license
  *            See https://raw.github.com/emberjs/ember.js/master/LICENSE
- * @version   2.10.0-beta.2-beta+7fdc8dd6
+ * @version   2.10.0-beta.3
  */
 
 var enifed, requireModule, require, Ember;
@@ -2469,6 +2469,16 @@ enifed('container/registry', ['exports', 'ember-utils', 'ember-metal', 'containe
 
     return privateNames[fullName] = _emberUtils.intern(type + ':' + rawName + '-' + privateSuffix);
   }
+});
+enifed("ember/features", ["exports"], function (exports) {
+  "use strict";
+
+  exports.default = { "features-stripped-test": false, "ember-libraries-isregistered": false, "ember-runtime-computed-uniq-by": true, "ember-improved-instrumentation": false, "ember-runtime-enumerable-includes": true, "ember-string-ishtmlsafe": true, "ember-testing-check-waiters": true, "ember-metal-weakmap": false, "ember-glimmer-allow-backtracking-rerender": true, "ember-testing-resume-test": false, "ember-glimmer-detect-backtracking-rerender": true, "mandatory-setter": true };
+});
+enifed("ember/version", ["exports"], function (exports) {
+  "use strict";
+
+  exports.default = "2.10.0-beta.3";
 });
 enifed('ember-console/index', ['exports', 'ember-environment'], function (exports, _emberEnvironment) {
   'use strict';
@@ -19373,16 +19383,6 @@ enifed('ember-runtime/utils', ['exports', 'ember-runtime/mixins/array', 'ember-r
 
     return ret;
   }
-});
-enifed("ember/features", ["exports"], function (exports) {
-  "use strict";
-
-  exports.default = { "features-stripped-test": false, "ember-libraries-isregistered": false, "ember-runtime-computed-uniq-by": true, "ember-improved-instrumentation": false, "ember-runtime-enumerable-includes": true, "ember-string-ishtmlsafe": true, "ember-testing-check-waiters": true, "ember-metal-weakmap": false, "ember-glimmer-allow-backtracking-rerender": false, "ember-testing-resume-test": false, "mandatory-setter": true, "ember-glimmer-detect-backtracking-rerender": true };
-});
-enifed("ember/version", ["exports"], function (exports) {
-  "use strict";
-
-  exports.default = "2.10.0-beta.2-beta+7fdc8dd6";
 });
 /*!
  * @overview RSVP - a tiny implementation of Promises/A+.
